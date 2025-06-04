@@ -44,7 +44,7 @@ const HomeScreen = ({ navigation, onLogout }) => {
     return (
         <View style={homeStyles.container}>
             <View style={homeStyles.header}>
-                <Image source={require('../images/avatar.png')} style={homeStyles.avatar} />
+                <Image source={require('../images/accountblue-icon.png')} style={homeStyles.avatar} />
                 {/* Hiển thị username đã lấy từ state */}
                 <Text style={homeStyles.greeting}>Hello, {username}</Text>
                 {/* Nút Đăng xuất */}

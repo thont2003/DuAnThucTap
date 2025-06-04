@@ -2,28 +2,29 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    TextInput, // Dùng TextInput thay vì component Input
+    TextInput,
     TouchableOpacity,
-    StyleSheet, // Dùng StyleSheet thay vì loginStyles riêng biệt
+    StyleSheet,
     Alert,
     ActivityIndicator,
     Image,
     Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; // Sử dụng useNavigation
+import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
 // Nhận prop `onLoginSuccess` từ AppNavigator
-const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props vì chúng ta dùng useNavigation()
+const LoginScreen = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState(''); // Để hiển thị thông báo lỗi/thành công trực tiếp trên UI
+    const [message, setMessage] = useState('');
+    const [showPassword, setShowPassword] = useState(false); // Thêm state để ẩn/hiện mật khẩu
 
-    const navigation = useNavigation(); // Khởi tạo hook useNavigation
+    const navigation = useNavigation();
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -32,7 +33,7 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
         }
 
         setLoading(true);
-        setMessage(''); // Xóa tin nhắn cũ
+        setMessage('');
 
         try {
             console.log('Đang gửi yêu cầu đăng nhập:', { email, password });
@@ -40,10 +41,8 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
             console.log('Phản hồi từ server:', response);
 
             if (response.ok) {
-                // *** QUAN TRỌNG: Đảm bảo server của bạn trả về `token` và `username` ***
                 const { userId, message, username, token } = response.data;
 
-                // 1. Lưu token (hoặc userId) vào AsyncStorage
                 if (token) {
                     await AsyncStorage.setItem('userToken', token);
                     console.log('Đã lưu userToken vào AsyncStorage:', token);
@@ -52,28 +51,21 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
                     console.log('Đã lưu userId vào AsyncStorage:', userId);
                 }
 
-                // 2. LƯU USERNAME THỰC TẾ TỪ SERVER VÀO ASYNCSTORAGE
                 if (username) {
                     await AsyncStorage.setItem('currentUsername', username);
                     console.log('Đã lưu currentUsername vào AsyncStorage:', username);
                 } else {
-                    // Cảnh báo nếu username không có trong phản hồi API.
                     console.warn("API '/login' không trả về 'username'. HomeScreen có thể hiển thị 'Guest'.");
                 }
 
-                Alert.alert('Thành công', message); // Hiển thị Alert thành công
-                setMessage(message); // Cập nhật tin nhắn trên UI (tùy chọn)
+                Alert.alert('Thành công', message);
+                setMessage(message);
 
-                // Gọi onLoginSuccess để thông báo cho AppNavigator đã đăng nhập thành công
-                // AppNavigator sẽ xử lý việc điều hướng đến HomeScreen
                 onLoginSuccess(token || String(userId));
-
-                // Bỏ dòng navigation.navigate('Home', { username });
-                // vì AppNavigator sẽ tự động điều hướng khi trạng thái đăng nhập thay đổi.
             } else {
                 const errorMessage = response.data?.error || 'Đăng nhập thất bại';
-                Alert.alert('Lỗi', errorMessage); // Hiển thị Alert lỗi
-                setMessage(errorMessage); // Cập nhật tin nhắn lỗi trên UI
+                Alert.alert('Lỗi', errorMessage);
+                setMessage(errorMessage);
             }
         } catch (error) {
             console.error('Lỗi khi gọi API đăng nhập:', error.message);
@@ -107,7 +99,7 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
                 <Text style={styles.inputLabel}>Email</Text>
                 <View style={styles.inputWrapper}>
                     <Image
-                        source={require('../images/avatar.png')} // Đảm bảo đường dẫn này đúng
+                        source={require('../images/avatar.png')} // Đã đổi lại thành user.png
                         style={styles.inputIcon}
                         onError={(e) => console.log('Lỗi tải icon email:', e.nativeEvent.error)}
                     />
@@ -126,7 +118,11 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
                 <Text style={styles.inputLabel}>Mật khẩu</Text>
                 <View style={styles.inputWrapper}>
                     <Image
-                        source={require('../images/home-icon.png')} // Biểu tượng khóa (giả sử bạn có)
+                        // Thay đổi icon dựa vào trạng thái showPassword
+                        source={showPassword ? require('../images/home-icon.png') : require('../images/home-icon.png')}
+                        // Lưu ý: Bạn cần có các file eye-open.png và eye-closed.png trong thư mục images.
+                        // Nếu không có, bạn có thể dùng tạm home-icon.png và user.png như trước,
+                        // hoặc dùng icon từ thư viện như FontAwesome/Ionicons.
                         style={styles.inputIcon}
                         onError={(e) => console.log('Lỗi tải icon mật khẩu:', e.nativeEvent.error)}
                     />
@@ -135,11 +131,21 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
                         placeholder="Mật khẩu"
                         value={password}
                         onChangeText={setPassword}
-                        secureTextEntry
+                        secureTextEntry={!showPassword} // Ẩn/hiện mật khẩu dựa vào state
                         placeholderTextColor="#a0a0a0"
                     />
-                    <TouchableOpacity style={styles.forgotPasswordButton}>
-                        <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+                    {/* Nút toggle ẩn/hiện mật khẩu */}
+                    <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.passwordToggle}
+                    >
+                        <Image
+                            source={showPassword ? require('../images/home-icon.png') : require('../images/home-icon.png')}
+                            // Lưu ý: Đảo ngược icon cho nút toggle để nó hiển thị trạng thái SẼ ĐƯỢC CHUYỂN ĐỔI
+                            // Ví dụ: nếu mật khẩu đang hiển thị (showPassword = true), nút sẽ hiện icon mắt đóng (để ẩn)
+                            style={styles.toggleIcon}
+                            onError={(e) => console.log('Lỗi tải icon toggle:', e.nativeEvent.error)}
+                        />
                     </TouchableOpacity>
                 </View>
 
@@ -167,6 +173,11 @@ const LoginScreen = ({ onLoginSuccess }) => { // Xóa `navigation` khỏi props 
                     </Text>
                 </TouchableOpacity>
 
+                {/* Nút quên mật khẩu */}
+                <TouchableOpacity style={styles.forgotPasswordButtonBottom}>
+                    <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+                </TouchableOpacity>
+
                 {message ? <Text style={styles.message}>{message}</Text> : null}
             </View>
         </View>
@@ -179,9 +190,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f0f0f0',
     },
+    scrollViewContent: {
+        flexGrow: 1,
+        justifyContent: 'flex-start',
+    },
     topSection: {
         width: '100%',
-        height: height * 0.35,
+        height: height * 0.35, // Chiều cao của phần banner
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
@@ -191,15 +206,26 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
-        marginHorizontal: 0,
-        paddingHorizontal: 0,
+    },
+    formContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+        marginTop: -10, // Kéo form lên để tạo hiệu ứng cong phủ lên banner
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingHorizontal: 25,
+        paddingTop: 80, // (chiều cao logo/2 + khoảng cách từ đỉnh form đến giữa logo) + một chút padding thêm
+        paddingBottom: 20,
+        alignItems: 'center',
     },
     logoContainer: {
         position: 'absolute',
-        bottom: 550, // Điều chỉnh giá trị này để logo hiển thị đúng vị trí
+        top: -100, // Điều chỉnh vị trí logo
+        left: '50%',
+        marginLeft: -55,
         width: 180,
         height: 180,
-        borderRadius: 120,
+        borderRadius: 90,
         backgroundColor: '#ffffff',
         justifyContent: 'center',
         alignItems: 'center',
@@ -214,17 +240,6 @@ const styles = StyleSheet.create({
         width: 180,
         height: 180,
         resizeMode: 'contain',
-    },
-    formContainer: {
-        flex: 1,
-        backgroundColor: '#fff',
-        marginTop: -10,
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        paddingHorizontal: 25,
-        paddingTop: 50,
-        paddingBottom: 20,
-        alignItems: 'center',
     },
     inputLabel: {
         alignSelf: 'flex-start',
@@ -258,13 +273,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#333',
     },
-    forgotPasswordButton: {
-        position: 'absolute',
-        right: 15,
+    // Style cho nút toggle mật khẩu
+    passwordToggle: {
+        padding: 5,
+        position: 'absolute', // Đặt nút toggle ở cuối inputWrapper
+        right: 10,
     },
-    forgotPasswordText: {
-        fontSize: 14,
-        color: '#007bff',
+    toggleIcon: {
+        width: 24, // Kích thước lớn hơn một chút cho dễ nhấn
+        height: 24,
+        tintColor: '#a0a0a0',
+        resizeMode: 'contain',
     },
     signInButton: {
         width: '100%',
@@ -296,6 +315,13 @@ const styles = StyleSheet.create({
         color: '#ff5c5c',
         fontWeight: 'bold',
         textDecorationLine: 'underline',
+    },
+    forgotPasswordButtonBottom: {
+        marginTop: 15,
+    },
+    forgotPasswordText: {
+        fontSize: 14,
+        color: '#007bff',
     },
     message: {
         marginTop: 20,
