@@ -20,7 +20,7 @@ export default StyleSheet.create({
     marginRight: 10,
   },
   greeting: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
