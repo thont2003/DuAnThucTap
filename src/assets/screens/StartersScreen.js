@@ -12,12 +12,12 @@ const StartersScreen = () => {
     { label: 'Grammar', route: 'Grammar' },
   ];
 
-  // Danh sách ảnh (thay đổi đường dẫn theo đúng file trong dự án của bạn)
+  // Danh sách ảnh và tiêu đề
   const images = [
-    require('../images/image1.jpg'), // Đường dẫn tới ảnh 1
-    require('../images/image2.jpg'), // Đường dẫn tới ảnh 2
-    require('../images/image3.jpg'), // Đường dẫn tới ảnh 3
-    require('../images/image4.jpg'), // Đường dẫn tới ảnh 4
+    { source: require('../images/image1.jpg'), title: 'Unit 0: Home' },
+    { source: require('../images/image2.jpg'), title: 'Unit 1: I love animal' },
+    { source: require('../images/image3.jpg'), title: 'Unit 2: Home' },
+    { source: require('../images/image4.jpg'), title: 'Unit 3: Family and friends' },
   ];
 
   return (
@@ -37,7 +37,7 @@ const StartersScreen = () => {
               key={index}
               onPress={() => navigation.navigate(tab.route)}
               style={styles.tab}
-Gol>
+            >
               <Text
                 style={[styles.tabText, tab.label === 'Starters' ? styles.activeTab : null]}
               >
@@ -49,16 +49,17 @@ Gol>
       </View>
       {/* Nội dung trang */}
       <View style={styles.content}>
-       
-        {/* Hiển thị 4 ảnh, 2 ảnh trên mỗi hàng */}
+        {/* Hiển thị 4 ảnh với khung trắng và tiêu đề */}
         <View style={styles.imageGrid}>
-          {images.map((image, index) => (
-            <Image
-              key={index}
-              source={image}
-              style={styles.image}
-              resizeMode="cover"
-            />
+          {images.map((item, index) => (
+            <View key={index} style={styles.imageContainer}>
+              <Image
+                source={item.source}
+                style={styles.image}
+                resizeMode="contain" // Đảm bảo ảnh hiển thị đầy đủ
+              />
+              <Text style={styles.imageTitle}>{item.title}</Text>
+            </View>
           ))}
         </View>
       </View>
@@ -69,6 +70,7 @@ Gol>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFF', // Nền trắng cho toàn màn hình
   },
   header: {
     backgroundColor: '#FFF',
@@ -86,7 +88,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   backButton: {
-    padding: 30,
+    padding: 10,
     borderRadius: 5,
   },
   backButtonText: {
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'left',
-    marginLeft: 20,
+    marginLeft: 10,
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
@@ -108,6 +110,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderTopColor: '#DDD',
   },
+  tab: {
+    paddingHorizontal: 10,
+  },
   tabText: {
     fontSize: 16,
     color: '#333',
@@ -118,25 +123,36 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: -120, // Đẩy nội dung xuống dưới header
-  },
-  contentText: {
-    fontSize: 18,
-    marginBottom: 20,
+    marginTop: 150, // Giữ khoảng cách giữa header và imageGrid
   },
   imageGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
+  },
+  imageContainer: {
+    width: '50%', // Chiếm 48% để có 2 ảnh trên mỗi hàng
+    backgroundColor: '#FFF', // Khung trắng bao quanh ảnh và tiêu đề
+    borderRadius: 10, // Bo góc khung
+    borderWidth: 1, // Viền khung
+    borderColor: '#DDD',
+    alignItems: 'center', // Căn giữa nội dung theo chiều ngang
+    justifyContent: 'center', // Căn giữa nội dung theo chiều dọc
+    marginBottom: 20,
+    padding: 2, // Giảm padding để thu hẹp khung trắng
+    paddingTop: 0, // Giảm padding trên để khung gọn hơn
   },
   image: {
-    width: '45%', // Chiếm khoảng 45% chiều rộng để có 2 ảnh trên mỗi hàng
-    height: "150", // Chiều cao cố định, bạn có thể điều chỉnh
-    marginBottom: 20,
-    borderRadius: 10, // Bo góc ảnh (tùy chọn)
+    width: '100%', // Ảnh chiếm toàn bộ chiều rộng của khung (sau padding)
+    height: 150, // Chiều cao cố định
+    borderRadius: 8, // Bo góc ảnh
+    marginBottom: 3, // Giảm khoảng cách giữa ảnh và tiêu đề
+  },
+  imageTitle: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
   },
 });
 
