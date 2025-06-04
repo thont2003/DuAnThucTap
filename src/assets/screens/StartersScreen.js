@@ -11,7 +11,7 @@ const StartersScreen = () => {
     { label: 'Flyers', route: 'Flyers' },
     { label: 'Grammar', route: 'Grammar' },
   ];
-
+  
   // Danh sách ảnh và tiêu đề
   const images = [
     { source: require('../images/image1.jpg'), title: 'Unit 0: Home' },
