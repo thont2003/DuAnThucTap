@@ -15,16 +15,16 @@ const HomeScreen = ({ route }) => {
   ];
 
   const navItems = [
-    { label: 'Home', icon: require('../images/homeblue-icon.png'), route: 'Home' },
-    { label: 'History', icon: require('../images/history-icon.png'), route: 'History' },
-    { label: 'Ranking', icon: require('../images/ranking-icon.png'), route: 'Ranking' },
-    { label: 'Account', icon: require('../images/account-icon.png'), route: 'Account' },
+    { label: 'Home', icon: require('../images/home/home-nav.png'), route: 'Home' },
+    { label: 'History', icon: require('../images/home/history-nav.png'), route: 'History' },
+    { label: 'Ranking', icon: require('../images/home/ranking-nav.png'), route: 'Ranking' },
+    { label: 'Account', icon: require('../images/home/account-nav.png'), route: 'Account' },
   ];
 
   return (
     <View style={homeStyles.container}>
       <View style={homeStyles.header}>
-        <Image source={require('../images/avatar.png')} style={homeStyles.avatar} />
+        <Image source={require('../images/home/account-home.png')} style={homeStyles.avatar} />
         <Text style={homeStyles.greeting}>Hello, {username}</Text>
       </View>
       <Image source={require('../images/banner.png')} style={homeStyles.banner} />
