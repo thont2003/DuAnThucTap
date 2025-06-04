@@ -24,7 +24,7 @@ const HomeScreen = ({ route }) => {
   return (
     <View style={homeStyles.container}>
       <View style={homeStyles.header}>
-        <Image source={require('../images/avatar.png')} style={homeStyles.avatar} />
+        <Image source={require('../images/home/account.png')} style={homeStyles.avatar} />
         <Text style={homeStyles.greeting}>Hello, {username}</Text>
       </View>
       <Image source={require('../images/banner.png')} style={homeStyles.banner} />
