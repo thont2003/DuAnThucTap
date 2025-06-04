@@ -42,11 +42,11 @@ const LoginScreen = () => {
             console.log('Phản hồi từ server:', response);
 
             if (response.ok) {
-                const { message } = response.data;
-                const username = email.split('@')[0];
+                const { message, username: usernameFromApi } = response.data; // Đổi tên để tránh trùng lặp nếu cần
+                const finalUsername = usernameFromApi || email.split('@')[0]; // Fallback nếu API không trả về username
 
                 Alert.alert('Thành công', message || 'Đăng nhập thành công!');
-                navigation.navigate('Home', { username });
+                navigation.navigate('Home', { username: finalUsername });
             } else {
                 const errorMessage = response.data?.error || 'Đăng nhập thất bại';
                 setMessage(errorMessage);
