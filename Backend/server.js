@@ -2,10 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ... other middleware ...
+
+const imagesDir = path.join(__dirname, 'public', 'images');
+console.log('Đường dẫn phục vụ ảnh tĩnh:', imagesDir);
+app.use('/images', express.static(imagesDir));
+
+// ... your routes ...
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -85,6 +94,37 @@ app.post('/login', async (req, res) => {
     console.error('Lỗi đăng nhập:', err);
     res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
   }
+});
+app.get('/levels', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT level_id, name, image_url FROM levels ORDER BY level_id ASC');
+        res.status(200).json(result.rows);
+    } catch (err) {
+      console.error('Lỗi khi lấy danh sách levels:', err);
+        res.status(500).json({ error: 'Lỗi server, không thể lấy dữ liệu levels.' });
+    }
+});
+
+// ROUTE CŨ TRONG CÂU HỎI TRƯỚC LÀ /units/:levelId
+// ROUTE MỚI BẠN CUNG CẤP LÀ /levels/:level_id/units
+// Tôi sẽ sử dụng route mới của bạn, nhưng bạn cần đảm bảo frontend gọi đúng URL này.
+app.get('/levels/:level_id/units', async (req, res) => {
+    const levelId = parseInt(req.params.level_id); // Đảm bảo chuyển đổi sang số nguyên
+
+    if (isNaN(levelId)) {
+        return res.status(400).json({ error: 'ID cấp độ không hợp lệ.' });
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT unit_id, title, image_url FROM units WHERE level_id = $1 ORDER BY unit_id ASC',
+            [levelId]
+        );
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error(`Lỗi khi lấy units cho level_id ${levelId}:`, err);
+        res.status(500).json({ error: 'Lỗi server nội bộ' });
+    }
 });
 
 // Get user info route (dành cho HomeScreen)

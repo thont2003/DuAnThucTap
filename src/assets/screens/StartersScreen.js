@@ -1,30 +1,124 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+// StartersScreen.js
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 const StartersScreen = () => {
   const navigation = useNavigation();
+  const [levels, setLevels] = useState([]);
+  const [currentLevel, setCurrentLevel] = useState(null);
+  const [units, setUnits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const tabs = [
-    { label: 'Starters', route: 'Starters' },
-    { label: 'Movers', route: 'Movers' },
-    { label: 'Flyers', route: 'Flyers' },
-    { label: 'Grammar', route: 'Grammar' },
-  ];
-  
-  // Danh sách ảnh và tiêu đề
-  const images = [
-    { source: require('../images/image1.jpg'), title: 'Unit 0: Home' },
-    { source: require('../images/image2.jpg'), title: 'Unit 1: I love animal' },
-    { source: require('../images/image3.jpg'), title: 'Unit 2: Home' },
-    { source: require('../images/image4.jpg'), title: 'Unit 3: Family and friends' },
-  ];
+  const API_BASE_URL = 'http://192.168.1.15:3000'; // Đảm bảo đây là IP đúng cho thiết bị của bạn
+
+  // Hàm để xây dựng URL ảnh đầy đủ
+  const getFullImageUrl = (imageFileName) => {
+    // Nếu imageFileName đã là một URL đầy đủ (ví dụ: từ các nguồn bên ngoài),
+    // bạn có thể trả về nó trực tiếp.
+    // Nếu không, nối nó với base URL và thư mục images.
+    if (imageFileName && imageFileName.startsWith('http')) {
+      return imageFileName;
+    }
+    // Đảm bảo có dấu '/' ở cuối API_BASE_URL nếu cần thiết,
+    // và dấu '/' giữa 'images' và tên file.
+    return `${API_BASE_URL}/images/${imageFileName}`;
+  };
+
+  // ... (các useEffect và handleLevelPress giữ nguyên) ...
+
+  useEffect(() => {
+    const fetchLevels = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/levels`);
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}. Chi tiết: ${errorBody}`);
+        }
+        const data = await response.json();
+        setLevels(data);
+
+        const defaultLevel = data.find(l => l.name === 'Starters');
+        if (defaultLevel) {
+          setCurrentLevel(defaultLevel);
+        } else if (data.length > 0) {
+          setCurrentLevel(data[0]);
+        } else {
+          setError("Không tìm thấy cấp độ nào trong database.");
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error("Lỗi khi lấy cấp độ:", e);
+        setError("Không thể tải dữ liệu cấp độ. Vui lòng thử lại sau.");
+        setLoading(false);
+      }
+    };
+
+    fetchLevels();
+  }, []);
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      if (!currentLevel) {
+        setLoading(false);
+        setUnits([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setUnits([]);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/levels/${currentLevel.level_id}/units`);
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}. Chi tiết: ${errorBody}`);
+        }
+        const data = await response.json();
+        setUnits(data);
+      } catch (e) {
+        console.error(`Lỗi khi lấy units cho level ${currentLevel.name}:`, e);
+        setError(`Không thể tải bài tập cho ${currentLevel.name}. Vui lòng thử lại sau.`);
+        setUnits([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentLevel) {
+      fetchUnits();
+    }
+  }, [currentLevel]);
+
+  const handleLevelPress = (level) => {
+    setCurrentLevel(level);
+  };
+
+  if (loading && !currentLevel) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#1E90FF" />
+        <Text>Đang tải dữ liệu...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
+          {/* Nút Back <-- */}
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Text style={styles.backButtonText}>{"<--"}</Text>
           </TouchableOpacity>
@@ -32,36 +126,70 @@ const StartersScreen = () => {
         </View>
         {/* Tabs */}
         <View style={styles.tabContainer}>
-          {tabs.map((tab, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => navigation.navigate(tab.route)}
-              style={styles.tab}
-            >
-              <Text
-                style={[styles.tabText, tab.label === 'Starters' ? styles.activeTab : null]}
+          {levels.length > 0 ? (
+            levels.map((level) => (
+              <TouchableOpacity
+                key={level.level_id}
+                onPress={() => handleLevelPress(level)}
+                style={styles.tab}
               >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.tabText,
+                    currentLevel && level.level_id === currentLevel.level_id
+                      ? styles.activeTab
+                      : null,
+                  ]}
+                >
+                  {level.name}
+                </Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.noLevelsText}>Không tìm thấy cấp độ nào.</Text>
+          )}
         </View>
       </View>
       {/* Nội dung trang */}
       <View style={styles.content}>
-        {/* Hiển thị 4 ảnh với khung trắng và tiêu đề */}
-        <View style={styles.imageGrid}>
-          {images.map((item, index) => (
-            <View key={index} style={styles.imageContainer}>
-              <Image
-                source={item.source}
-                style={styles.image}
-                resizeMode="contain" // Đảm bảo ảnh hiển thị đầy đủ
-              />
-              <Text style={styles.imageTitle}>{item.title}</Text>
+        {loading && currentLevel ? (
+          <View style={styles.centeredContent}>
+            <ActivityIndicator size="large" color="#1E90FF" />
+            <Text>Đang tải bài tập...</Text>
+          </View>
+        ) : (
+          units.length > 0 ? (
+            <FlatList
+              data={units}
+              keyExtractor={item => item.unit_id.toString()}
+              numColumns={2}
+              renderItem={({ item }) => (
+                <TouchableOpacity key={item.unit_id} style={styles.imageContainer}
+                  onPress={() => {
+                    console.log(`Đã nhấn vào Unit: ${item.title} (Level: ${currentLevel.name})`);
+                    // Đây là nơi bạn sẽ điều hướng đến màn hình chi tiết bài tập
+                    // Ví dụ: navigation.navigate('UnitDetailScreen', { unitId: item.unit_id, unitTitle: item.title });
+                  }}
+                >
+                  {/* SỬA CHỮA TẠI ĐÂY: Sử dụng getFullImageUrl */}
+                  <Image
+                    source={{ uri: getFullImageUrl(item.image_url) }}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.imageTitle}>{item.title}</Text>
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.imageGrid}
+            />
+          ) : (
+            <View style={styles.centeredContent}>
+              <Text style={styles.noUnitsText}>
+                {currentLevel ? `Không có bài tập nào cho ${currentLevel.name}.` : 'Không có bài tập nào để hiển thị.'}
+              </Text>
             </View>
-          ))}
-        </View>
+          )
+        )}
       </View>
     </View>
   );
@@ -70,7 +198,7 @@ const StartersScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF', // Nền trắng cho toàn màn hình
+    backgroundColor: '#FFF',
   },
   header: {
     backgroundColor: '#FFF',
@@ -112,6 +240,8 @@ const styles = StyleSheet.create({
   },
   tab: {
     paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
   },
   tabText: {
     fontSize: 16,
@@ -123,35 +253,63 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    marginTop: 150, // Giữ khoảng cách giữa header và imageGrid
+    marginTop: 150,
+    paddingTop: 10,
   },
   imageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
+    paddingBottom: 20,
   },
   imageContainer: {
-    width: '50%', // Chiếm 48% để có 2 ảnh trên mỗi hàng
-    backgroundColor: '#FFF', // Khung trắng bao quanh ảnh và tiêu đề
-    borderRadius: 10, // Bo góc khung
-    borderWidth: 1, // Viền khung
+    width: '48%',
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    borderWidth: 1,
     borderColor: '#DDD',
-    alignItems: 'center', // Căn giữa nội dung theo chiều ngang
-    justifyContent: 'center', // Căn giữa nội dung theo chiều dọc
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
-    padding: 2, // Giảm padding để thu hẹp khung trắng
-    paddingTop: 0, // Giảm padding trên để khung gọn hơn
+    padding: 2,
+    paddingTop: 0,
   },
   image: {
-    width: '100%', // Ảnh chiếm toàn bộ chiều rộng của khung (sau padding)
-    height: 150, // Chiều cao cố định
-    borderRadius: 8, // Bo góc ảnh
-    marginBottom: 3, // Giảm khoảng cách giữa ảnh và tiêu đề
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 3,
   },
   imageTitle: {
     fontSize: 14,
     color: '#333',
+    textAlign: 'center',
+    paddingHorizontal: 5,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+  },
+  noLevelsText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    flex: 1,
+  },
+  noUnitsText: {
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
   },
 });

@@ -8,13 +8,15 @@ import StartersScreen from '../screens/StartersScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import RankingScreen from '../screens/RankingScreen';
 import AccountScreen from '../screens/AccountScreen';
+import UnitsScreen from '../screens/UnitsScreen';
+import IntroScreen from '../screens/IntroScreen';
 
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Register">
+      <Stack.Navigator initialRouteName="IntroScreen">
         <Stack.Screen
           name="Register"
           component={RegisterScreen}
@@ -23,6 +25,11 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="IntroScreen"
+          component={IntroScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -43,6 +50,11 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Ranking"
           component={RankingScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Units"
+          component={UnitsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
