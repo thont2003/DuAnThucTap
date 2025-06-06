@@ -12,6 +12,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
@@ -24,7 +25,7 @@ const LoginScreen = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-
+    const [rememberMe, setRememberMe] = useState(true);
     const navigation = useNavigation();
 
     const handleLogin = async () => {
@@ -37,13 +38,13 @@ const LoginScreen = () => {
         setMessage('');
 
         try {
-            console.log('Đang gửi yêu cầu đăng nhập:', { email, password });
+            console.log('Sending login request:', { email, password });
             const response = await apiCall('POST', '/login', { email, password });
-            console.log('Phản hồi từ server:', response);
+            console.log('Server response:', response);
 
             if (response.ok) {
-                const { message, username: usernameFromApi } = response.data; // Đổi tên để tránh trùng lặp nếu cần
-                const finalUsername = usernameFromApi || email.split('@')[0]; // Fallback nếu API không trả về username
+                const { message, username: usernameFromApi } = response.data;
+                const finalUsername = usernameFromApi || email.split('@')[0];
 
                 Alert.alert('Thành công', message || 'Đăng nhập thành công!');
                 navigation.navigate('Home', { username: finalUsername });
@@ -53,9 +54,9 @@ const LoginScreen = () => {
                 Alert.alert('Lỗi', errorMessage);
             }
         } catch (error) {
-            console.error('Lỗi khi gọi API đăng nhập:', error.message);
-            setMessage('Không thể kết nối đến server. Vui lòng kiểm tra kết nối và thử lại.');
-            Alert.alert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối và thử lại.');
+            console.error('Error calling login API:', error.message);
+            setMessage('Cannot connect to server. Please check connection and try again.');
+            Alert.alert('Lỗi', 'Cannot connect to server. Please check connection and try again.');
         } finally {
             setLoading(false);
         }
@@ -66,40 +67,37 @@ const LoginScreen = () => {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="#e0e8ff"
+            />
             <ScrollView
                 contentContainerStyle={styles.scrollViewContent}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Top Section with Background Image */}
-                <View style={styles.topSection}>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <Image
-                        source={require('../images/banner.png')}
-                        style={styles.topBackgroundImage}
+                        source={require('../images/login_signup/back.png')}
+                        style={styles.backIcon}
                     />
-                </View>
+                </TouchableOpacity>
 
-                {/* Logo Container - MOVED OUTSIDE formContainer to fix positioning */}
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('../images/avatar.png')}
+                        source={require('../images/login_signup/logo.png')}
                         style={styles.logo}
-                        onError={(e) => console.log('Lỗi tải logo:', e.nativeEvent.error)}
+                        onError={(e) => console.log('Error loading logo:', e.nativeEvent.error)}
                     />
                 </View>
 
-                {/* Login Form */}
                 <View style={styles.formContainer}>
-                    {/* Email Input */}
-                    <Text style={styles.inputLabel}>Email</Text>
+                    <Text style={styles.loginTitle}>Login</Text>
+
+                    <Text style={styles.inputLabel}>Email address</Text>
                     <View style={styles.inputWrapper}>
-                        <Image
-                            source={require('../images/home-icon.png')} // Changed to email specific icon
-                            style={styles.inputIcon}
-                            onError={(e) => console.log('Lỗi tải icon email:', e.nativeEvent.error)}
-                        />
                         <TextInput
                             style={styles.input}
-                            placeholder="Email"
+                            placeholder="Your email address"
                             value={email}
                             onChangeText={setEmail}
                             autoCapitalize="none"
@@ -108,17 +106,11 @@ const LoginScreen = () => {
                         />
                     </View>
 
-                    {/* Password Input */}
-                    <Text style={styles.inputLabel}>Mật khẩu</Text>
+                    <Text style={styles.inputLabel}>Password</Text>
                     <View style={styles.inputWrapper}>
-                        <Image
-                            source={require('../images/home-icon.png')} // Changed to lock icon
-                            style={styles.inputIcon}
-                            onError={(e) => console.log('Lỗi tải icon mật khẩu:', e.nativeEvent.error)}
-                        />
                         <TextInput
                             style={styles.input}
-                            placeholder="Mật khẩu"
+                            placeholder="Your password"
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry={!showPassword}
@@ -131,44 +123,57 @@ const LoginScreen = () => {
                             <Image
                                 source={
                                     showPassword
-                                        ? require('../images/home-icon.png') // Icon khi mật khẩu hiển thị
-                                        : require('../images/home-icon.png') // Icon khi mật khẩu ẩn
+                                        ? require('../images/login_signup/eye_1.png')
+                                        : require('../images/login_signup/eye_2.png')
                                 }
                                 style={styles.toggleIcon}
                             />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Sign In Button */}
+                    <View style={styles.optionsContainer}>
+                        <TouchableOpacity style={styles.rememberMeContainer} onPress={() => setRememberMe(!rememberMe)}>
+                            {rememberMe ? (
+                                <Image
+                                    source={require('../images/login_signup/checkbox.png')}
+                                    style={styles.checkboxIcon}
+                                />
+                            ) : (
+                                <Image
+                                    source={require('../images/login_signup/uncheckbox.png')}
+                                    style={styles.checkboxIcon}
+                                />
+                            )}
+                            <Text style={styles.rememberMeText}>Remember me</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => console.log('Forgot password pressed')}>
+                            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                        </TouchableOpacity>
+                    </View>
+
                     <TouchableOpacity
-                        style={styles.signInButton}
+                        style={styles.loginButton}
                         onPress={handleLogin}
                         disabled={loading}
                     >
                         {loading ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.signInButtonText}>Đăng nhập</Text>
+                            <Text style={styles.loginButtonText}>Login</Text>
                         )}
                     </TouchableOpacity>
 
-                    {/* Sign Up Link */}
-                    <TouchableOpacity
-                        style={styles.signUpLink}
-                        onPress={() => navigation.navigate('Register')}
-                    >
-                        <Text style={styles.signUpLinkText}>
-                            Chưa có tài khoản?{' '}
-                            <Text style={styles.signUpLinkTextUnderline}>Đăng ký</Text>
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Forgot Password Link - moved to bottom */}
-                    <TouchableOpacity style={styles.forgotPasswordButtonBottom}>
-                        <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
-                    </TouchableOpacity>
-
                     {message ? <Text style={styles.message}>{message}</Text> : null}
+
+                    {/* Đã di chuyển vào trong formContainer và áp dụng marginTop */}
+                    <View style={styles.signUpContainer}>
+                        <Text style={styles.dontHaveAccountText}>
+                            Don't have an account?{' '}
+                        </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                            <Text style={styles.signupText}>Signup</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -178,93 +183,100 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#e0e8ff',
+        paddingTop: Platform.OS === 'ios' ? StatusBar.currentHeight || 0 : 0,
     },
     scrollViewContent: {
         flexGrow: 1,
         justifyContent: 'flex-start',
+        alignItems: 'center',
     },
-    topSection: {
-        width: '100%',
-        height: height * 0.35, // Chiều cao của phần banner
+    backButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 60 : 40,
+        left: 20,
+        zIndex: 10,
+    },
+    backIcon: {
+        width: 24,
+        height: 24,
+        tintColor: '#333',
+        resizeMode: 'contain',
+    },
+    logoContainer: {
+        width: 240,
+        height: 240,
+        borderRadius: 120,
+        backgroundColor: '#fff',
+        borderColor: '#f0f0f0',
+        borderWidth: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden',
+        position: 'absolute',
+        top: height * 0.08,
+        left: '50%',
+        marginLeft: -120,
+        zIndex: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 3,
     },
-    topBackgroundImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
+    logo: {
+        width: 240,
+        height: 240,
+        resizeMode: 'contain',
     },
     formContainer: {
         flex: 1,
+        width: '100%',
         backgroundColor: '#fff',
-        marginTop: -10, // Kéo form lên để tạo hiệu ứng cong phủ lên banner
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
         paddingHorizontal: 25,
-        // Điều chỉnh paddingTop để tạo không gian cho logo và căn chỉnh các input
-        paddingTop: 80, // (chiều cao logo/2 + khoảng cách từ đỉnh form đến giữa logo) + một chút padding thêm
-        paddingBottom: 20,
+        paddingTop: 150,
         alignItems: 'center',
-    },
-    // Định vị logoContainer độc lập với formContainer
-    logoContainer: {
-        position: 'absolute',
-        // Đặt logo ở giữa đường cong của form và banner
-        top: 200, // Chiều cao của topSection - một nửa chiều cao logo (180/2 = 90)
-        left: '50%', // Bắt đầu từ giữa ngang
-        marginLeft: -90, // Kéo về phía trái một nửa chiều rộng logo để căn giữa thực sự
-        width: 180,
-        height: 180,
-        borderRadius: 90, // Đảm bảo hình tròn hoàn hảo (bán kính = chiều rộng/2)
-        backgroundColor: '#ffffff',
-        justifyContent: 'center',
-        alignItems: 'center',
+        marginTop: height * 0.22,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 15,
-        zIndex: 10,
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 8,
+        paddingBottom: 60, // Đã thêm padding để đảm bảo khoảng trống và khả năng cuộn
     },
-    logo: {
-        width: 180,
-        height: 180,
-        resizeMode: 'contain',
+    loginTitle: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 30,
+        alignSelf: 'flex-start',
     },
     inputLabel: {
         alignSelf: 'flex-start',
         fontSize: 14,
-        color: '#888',
-        marginBottom: 5,
-        fontWeight: 'bold',
+        color: '#666',
+        marginBottom: 8,
+        fontWeight: '500',
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         width: '100%',
         height: 50,
-        backgroundColor: '#f5f5f5',
-        borderRadius: 25,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
         paddingHorizontal: 15,
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#e0e0e0',
-    },
-    inputIcon: {
-        width: 20,
-        height: 20,
-        marginRight: 10,
-        resizeMode: 'contain',
-        tintColor: '#a0a0a0',
     },
     input: {
         flex: 1,
         height: '100%',
         fontSize: 16,
         color: '#333',
+        paddingVertical: 0,
     },
     passwordToggle: {
         padding: 5,
@@ -272,46 +284,65 @@ const styles = StyleSheet.create({
     toggleIcon: {
         width: 20,
         height: 20,
-        tintColor: '#a0a0a0',
+        tintColor: '#000',
         resizeMode: 'contain',
     },
-    signInButton: {
+    optionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginBottom: 30,
+        alignItems: 'center',
+    },
+    rememberMeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    checkboxIcon: {
+        width: 24,
+        height: 24,
+        marginRight: 8,
+        resizeMode: 'contain',
+        tintColor: '#ff5c5c',
+    },
+    rememberMeText: {
+        fontSize: 15,
+        color: '#666',
+    },
+    forgotPasswordText: {
+        fontSize: 15,
+        color: '#ff5c5c',
+        fontWeight: '600',
+    },
+    loginButton: {
         width: '100%',
         height: 55,
         backgroundColor: '#ff5c5c',
-        borderRadius: 28,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 7,
     },
-    signInButtonText: {
+    loginButtonText: {
         color: '#fff',
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
     },
-    signUpLink: {
-        marginTop: 25,
+    signUpContainer: {
+        marginTop: 100,
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 25,
     },
-    signUpLinkText: {
-        color: '#888',
+    dontHaveAccountText: {
         fontSize: 15,
+        color: '#666',
     },
-    signUpLinkTextUnderline: {
+    signupText: {
+        fontSize: 15,
         color: '#ff5c5c',
         fontWeight: 'bold',
-        textDecorationLine: 'underline',
-    },
-    forgotPasswordButtonBottom: {
-        marginTop: 15,
-    },
-    forgotPasswordText: {
-        fontSize: 14,
-        color: '#007bff',
     },
     message: {
         marginTop: 20,
