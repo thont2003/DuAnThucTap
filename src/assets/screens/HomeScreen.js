@@ -116,7 +116,6 @@ const HomeScreen = ({ route }) => {
                                     resizeMode="contain"
                                     onError={(e) => console.log('Lỗi tải ảnh Level:', e.nativeEvent.error, 'URL:', getFullImageUrl(item.image_url))}
                                 />
-                                <Text style={homeStyles.categoryName}>{item.name}</Text>
                             </View>
                         </TouchableOpacity>
                     ))}
@@ -252,12 +251,6 @@ const homeStyles = StyleSheet.create({
         height: '70%',
         resizeMode: 'contain', // Đảm bảo ảnh vừa vặn và không bị méo
         marginBottom: 5, // Khoảng cách giữa ảnh và tên level
-    },
-    categoryName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
     },
     bottomNav: {
         position: 'absolute',
