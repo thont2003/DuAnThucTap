@@ -10,6 +10,8 @@ import RankingScreen from '../screens/RankingScreen';
 import AccountScreen from '../screens/AccountScreen';
 import UnitsScreen from '../screens/UnitsScreen';
 import IntroScreen from '../screens/IntroScreen';
+import TestScreen from '../screens/TestScreen'; // <-- THÊM DÒNG NÀY
+import DetailTestScreen from '../screens/DetailTestScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -60,6 +62,16 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Account"
           component={AccountScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen // <-- THÊM KHỐI NÀY
+          name="TestScreen" // Đảm bảo tên này khớp chính xác với tên bạn gọi trong navigation.navigate()
+          component={TestScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DetailTest"
+          component={DetailTestScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
