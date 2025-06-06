@@ -11,6 +11,8 @@ import AccountScreen from '../screens/AccountScreen';
 import UnitsScreen from '../screens/UnitsScreen';
 import IntroScreen from '../screens/IntroScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import TestScreen from '../screens/TestScreen';
+import DetailTestScreen from '../screens/DetailTestScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -63,12 +65,23 @@ const AppNavigator = () => {
           component={AccountScreen}
           options={{ headerShown: false }}
         />
+         <Stack.Screen
+          name="TestScreen"
+          component={TestScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DetailTest"
+          component={DetailTestScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="EditProfileScreen"
           component={EditProfileScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
+      
     </NavigationContainer>
   );
 };
