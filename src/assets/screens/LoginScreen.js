@@ -5,7 +5,7 @@ import {
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    Alert,
+    // Alert, // Xóa Alert vì chúng ta sẽ dùng CustomAlertDialog
     ActivityIndicator,
     Image,
     Dimensions,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
+import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,11 +27,42 @@ const LoginScreen = () => {
     const [message, setMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
+
+    // State cho Custom Alert
+    const [isAlertVisible, setIsAlertVisible] = useState(false);
+    const [alertTitle, setAlertTitle] = useState('');
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertOnConfirm, setAlertOnConfirm] = useState(() => () => {});
+    const [alertOnCancel, setAlertOnCancel] = useState(() => () => {});
+    const [alertConfirmText, setAlertConfirmText] = useState('OK');
+    const [alertCancelText, setAlertCancelText] = useState('Hủy');
+    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
+
     const navigation = useNavigation();
+
+    // Hàm hiển thị Custom Alert
+    const showCustomAlert = (
+        title,
+        message,
+        confirmAction = () => setIsAlertVisible(false),
+        cancelAction = null,
+        confirmBtnText = 'OK',
+        cancelBtnText = 'Hủy',
+        shouldShowCancelButton = true // Mặc định là true
+    ) => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertOnConfirm(() => confirmAction);
+        setAlertOnCancel(() => cancelAction ? cancelAction : () => setIsAlertVisible(false));
+        setAlertConfirmText(confirmBtnText);
+        setAlertCancelText(cancelBtnText);
+        setShowAlertCancelButton(shouldShowCancelButton);
+        setIsAlertVisible(true);
+    };
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+            showCustomAlert('Lỗi', 'Vui lòng nhập email và mật khẩu'); // Sử dụng Custom Alert
             return;
         }
 
@@ -46,17 +78,27 @@ const LoginScreen = () => {
                 const { message, username: usernameFromApi } = response.data;
                 const finalUsername = usernameFromApi || email.split('@')[0];
 
-                Alert.alert('Thành công', message || 'Đăng nhập thành công!');
-                navigation.navigate('Home', { username: finalUsername });
+                showCustomAlert(
+                    'Thành công',
+                    message || 'Đăng nhập thành công!',
+                    () => {
+                        setIsAlertVisible(false); // Đóng alert
+                        navigation.navigate('Home', { username: finalUsername }); // Điều hướng
+                    },
+                    null, // Không có hàm cancel đặc biệt
+                    'OK',
+                    'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
+                    false // Không hiển thị nút Hủy
+                );
             } else {
                 const errorMessage = response.data?.error || 'Đăng nhập thất bại';
                 setMessage(errorMessage);
-                Alert.alert('Lỗi', errorMessage);
+                showCustomAlert('Lỗi', errorMessage); // Mặc định vẫn có nút hủy nếu là lỗi
             }
         } catch (error) {
             console.error('Error calling login API:', error.message);
             setMessage('Cannot connect to server. Please check connection and try again.');
-            Alert.alert('Lỗi', 'Cannot connect to server. Please check connection and try again.');
+            showCustomAlert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối.'); // Sử dụng Custom Alert
         } finally {
             setLoading(false);
         }
@@ -65,7 +107,6 @@ const LoginScreen = () => {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <StatusBar
                 barStyle="dark-content"
@@ -146,7 +187,7 @@ const LoginScreen = () => {
                             )}
                             <Text style={styles.rememberMeText}>Remember me</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => console.log('Forgot password pressed')}>
+                        <TouchableOpacity onPress={() => showCustomAlert('Thông báo', 'Tính năng quên mật khẩu đang được phát triển.')}>
                             <Text style={styles.forgotPasswordText}>Forgot password?</Text>
                         </TouchableOpacity>
                     </View>
@@ -165,7 +206,6 @@ const LoginScreen = () => {
 
                     {message ? <Text style={styles.message}>{message}</Text> : null}
 
-                    {/* Đã di chuyển vào trong formContainer và áp dụng marginTop */}
                     <View style={styles.signUpContainer}>
                         <Text style={styles.dontHaveAccountText}>
                             Don't have an account?{' '}
@@ -176,6 +216,18 @@ const LoginScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Custom Alert Dialog */}
+            <CustomAlertDialog
+                isVisible={isAlertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                onConfirm={alertOnConfirm}
+                onCancel={alertOnCancel}
+                confirmText={alertConfirmText}
+                cancelText={alertCancelText}
+                showCancelButton={showAlertCancelButton}
+            />
         </KeyboardAvoidingView>
     );
 };
@@ -243,7 +295,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 10,
         elevation: 8,
-        paddingBottom: 60, // Đã thêm padding để đảm bảo khoảng trống và khả năng cuộn
     },
     loginTitle: {
         fontSize: 32,
@@ -328,7 +379,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     signUpContainer: {
-        marginTop: 100,
+        marginTop: 50,
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',

@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    Alert,
     ActivityIndicator,
     Image,
     Dimensions,
@@ -13,10 +12,11 @@ import {
     Platform,
     ScrollView,
     StatusBar,
-    BackHandler, // Import BackHandler
+    BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
+import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
 
 const { width, height } = Dimensions.get('window');
 
@@ -29,13 +29,44 @@ const RegisterScreen = () => {
     const [message, setMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // State cho Custom Alert
+    const [isAlertVisible, setIsAlertVisible] = useState(false);
+    const [alertTitle, setAlertTitle] = useState('');
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertOnConfirm, setAlertOnConfirm] = useState(() => () => {});
+    const [alertOnCancel, setAlertOnCancel] = useState(() => () => {});
+    const [alertConfirmText, setAlertConfirmText] = useState('OK');
+    const [alertCancelText, setAlertCancelText] = useState('Hủy');
+    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
+
     const navigation = useNavigation();
 
-    // useEffect để xử lý nút back cứng trên Android
+    // Hàm hiển thị Custom Alert
+    // Thêm showCancelButton vào tham số
+    const showCustomAlert = (
+        title,
+        message,
+        confirmAction = () => setIsAlertVisible(false),
+        cancelAction = null,
+        confirmBtnText = 'OK',
+        cancelBtnText = 'Hủy',
+        shouldShowCancelButton = true // Mặc định là true
+    ) => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertOnConfirm(() => confirmAction);
+        setAlertOnCancel(() => cancelAction ? cancelAction : () => setIsAlertVisible(false));
+        setAlertConfirmText(confirmBtnText);
+        setAlertCancelText(cancelBtnText);
+        setShowAlertCancelButton(shouldShowCancelButton); // Cập nhật state này
+        setIsAlertVisible(true);
+    };
+
     useEffect(() => {
         const backAction = () => {
-            navigation.navigate('IntroScreen'); // Điều hướng về IntroScreen
-            return true; // Trả về true để ngăn hành vi mặc định của nút back
+            navigation.navigate('IntroScreen');
+            return true;
         };
 
         const backHandler = BackHandler.addEventListener(
@@ -43,17 +74,17 @@ const RegisterScreen = () => {
             backAction
         );
 
-        return () => backHandler.remove(); // Hủy đăng ký listener khi component unmount
-    }, [navigation]); // Dependency array: chỉ chạy lại effect khi navigation thay đổi
+        return () => backHandler.remove();
+    }, [navigation]);
 
     const handleRegister = async () => {
         if (!username || !email || !password || !confirmPassword) {
-            Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+            showCustomAlert('Lỗi', 'Mật khẩu xác nhận không khớp');
             return;
         }
 
@@ -66,17 +97,27 @@ const RegisterScreen = () => {
             console.log('Server response:', response);
 
             if (response.ok) {
-                Alert.alert('Thành công', response.data.message || 'Đăng ký thành công!');
-                navigation.navigate('Login');
+                showCustomAlert(
+                    'Thành công',
+                    response.data.message || 'Đăng ký thành công!',
+                    () => {
+                        setIsAlertVisible(false); // Đóng alert
+                        navigation.navigate('Login'); // Điều hướng
+                    },
+                    null, // Không có hàm cancel đặc biệt cho trường hợp này
+                    'OK', // Nút chỉ là 'OK'
+                    'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
+                    false // Rất quan trọng: Không hiển thị nút Hủy
+                );
             } else {
                 const errorMessage = response.data?.error || 'Đăng ký thất bại';
                 setMessage(errorMessage);
-                Alert.alert('Lỗi', errorMessage);
+                showCustomAlert('Lỗi', errorMessage); // Mặc định vẫn có nút hủy nếu là lỗi
             }
         } catch (error) {
             console.error('Error calling register API:', error.message);
             setMessage('Cannot connect to server. Please check connection and try again.');
-            Alert.alert('Lỗi', 'Cannot connect to server. Please check connection and try again.');
+            showCustomAlert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối.');
         } finally {
             setLoading(false);
         }
@@ -85,7 +126,6 @@ const RegisterScreen = () => {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <StatusBar
                 barStyle="dark-content"
@@ -212,6 +252,18 @@ const RegisterScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Custom Alert Dialog */}
+            <CustomAlertDialog
+                isVisible={isAlertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                onConfirm={alertOnConfirm}
+                onCancel={alertOnCancel}
+                confirmText={alertConfirmText}
+                cancelText={alertCancelText}
+                showCancelButton={showAlertCancelButton} // Truyền prop này vào
+            />
         </KeyboardAvoidingView>
     );
 };
@@ -220,7 +272,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#e0e8ff',
-        paddingTop: Platform.OS === 'ios' ? StatusBar.currentHeight || 0 : 0, 
+        paddingTop: Platform.OS === 'ios' ? StatusBar.currentHeight || 0 : 0,
     },
     scrollViewContent: {
         flexGrow: 1,
@@ -279,13 +331,12 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 10,
         elevation: 8,
-        paddingBottom: 60,
     },
     loginTitle: {
         fontSize: 32,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 30,
+        marginBottom: 10,
         alignSelf: 'flex-start',
     },
     inputLabel: {
@@ -364,11 +415,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     signUpContainer: {
-        marginTop: 60,
+        marginTop: 20,
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', 
+        justifyContent: 'center',
         paddingHorizontal: 25,
     },
     dontHaveAccountText: {

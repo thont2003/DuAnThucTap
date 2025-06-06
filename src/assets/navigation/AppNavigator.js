@@ -10,6 +10,7 @@ import RankingScreen from '../screens/RankingScreen';
 import AccountScreen from '../screens/AccountScreen';
 import UnitsScreen from '../screens/UnitsScreen';
 import IntroScreen from '../screens/IntroScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -60,6 +61,11 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Account"
           component={AccountScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="EditProfileScreen"
+          component={EditProfileScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
