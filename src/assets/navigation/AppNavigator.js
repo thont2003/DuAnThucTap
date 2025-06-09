@@ -65,13 +65,13 @@ const AppNavigator = () => {
           component={AccountScreen}
           options={{ headerShown: false }}
         />
-         <Stack.Screen
+        <Stack.Screen
           name="TestScreen"
           component={TestScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
-          name="DetailTest"
+          name="DetailTestScreen"
           component={DetailTestScreen}
           options={{ headerShown: false }}
         />
