@@ -19,7 +19,7 @@ app.use('/images', express.static(imagesDir));
 // PostgreSQL connection
 const pool = new Pool({
   user: 'postgres',
-  host: '192.168.1.15', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+  host: '192.168.1.8', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
   database: 'app_english',
   password: '123',
   port: 5432,
@@ -194,7 +194,71 @@ app.get('/api/user', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server, vui lòng thử lại sau' });
   }
 });
+// Route để lấy tất cả câu hỏi và các đáp án liên quan cho một bài test
+app.get('/tests/:test_id/questions', async (req, res) => {
+  const testId = parseInt(req.params.test_id);
 
+  if (isNaN(testId)) {
+    return res.status(400).json({ error: 'ID bài kiểm tra không hợp lệ.' });
+  }
+
+  try {
+    // Lấy tất cả câu hỏi cho test_id này
+    const questionsResult = await pool.query(
+      'SELECT question_id, test_id, type_id, content, image_path, correct_answer, audio_path FROM questions WHERE test_id = $1 ORDER BY question_id ASC',
+      [testId]
+    );
+
+    if (questionsResult.rows.length === 0) {
+      return res.status(200).json([]); // Trả về mảng rỗng nếu không có câu hỏi
+    }
+
+    const questionsWithAnswers = [];
+    for (const question of questionsResult.rows) {
+      // Với mỗi câu hỏi, lấy tất cả đáp án liên quan
+      const answersResult = await pool.query(
+        'SELECT answer_id, question_id, answer_text, is_correct FROM answers WHERE question_id = $1 ORDER BY answer_id ASC',
+        [question.question_id]
+      );
+      
+      // Gán mảng đáp án vào đối tượng câu hỏi
+      questionsWithAnswers.push({
+        ...question,
+        answers: answersResult.rows,
+      });
+    }
+
+    res.status(200).json(questionsWithAnswers);
+  } catch (err) {
+    console.error(`Lỗi khi lấy câu hỏi cho test_id ${testId}:`, err);
+    res.status(500).json({ error: 'Lỗi server nội bộ khi lấy câu hỏi.' });
+  }
+});
+
+
+app.post('/history', async (req, res) => {
+    const { userId, testId, score, totalQuestions, correctAnswers, userAnswers } = req.body;
+
+    // Kiểm tra dữ liệu đầu vào
+    if (userId === undefined || testId === undefined || score === undefined || totalQuestions === undefined || correctAnswers === undefined || userAnswers === undefined) {
+        return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ thông tin kết quả bài làm.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO public.history (user_id, test_id, score, total_questions, correct_answers, user_answers)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING history_id`,
+            [userId, testId, score, totalQuestions, correctAnswers, JSON.stringify(userAnswers)] // JSON.stringify() là cần thiết để lưu mảng/đối tượng JS vào cột JSONB
+        );
+        res.status(201).json({ 
+            message: 'Kết quả bài làm đã được lưu thành công.', 
+            historyId: result.rows[0].history_id 
+        });
+    } catch (err) {
+        console.error('Lỗi khi lưu kết quả bài làm:', err);
+        res.status(500).json({ error: 'Lỗi server nội bộ khi lưu kết quả bài làm.' });
+    }
+});
 
 app.listen(3000, () => {
   console.log('✅ Server is running at http://localhost:3000');

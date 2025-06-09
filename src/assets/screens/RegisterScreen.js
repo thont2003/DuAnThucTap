@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
+import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +31,37 @@ const RegisterScreen = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const navigation = useNavigation();
+    
+    // State cho Custom Alert
+    const [isAlertVisible, setIsAlertVisible] = useState(false);
+    const [alertTitle, setAlertTitle] = useState('');
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertOnConfirm, setAlertOnConfirm] = useState(() => () => {});
+    const [alertOnCancel, setAlertOnCancel] = useState(() => () => {});
+    const [alertConfirmText, setAlertConfirmText] = useState('OK');
+    const [alertCancelText, setAlertCancelText] = useState('Hủy');
+    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
+
+     // Hàm hiển thị Custom Alert
+    // Thêm showCancelButton vào tham số
+    const showCustomAlert = (
+        title,
+        message,
+        confirmAction = () => setIsAlertVisible(false),
+        cancelAction = null,
+        confirmBtnText = 'OK',
+        cancelBtnText = 'Hủy',
+        shouldShowCancelButton = true // Mặc định là true
+    ) => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertOnConfirm(() => confirmAction);
+        setAlertOnCancel(() => cancelAction ? cancelAction : () => setIsAlertVisible(false));
+        setAlertConfirmText(confirmBtnText);
+        setAlertCancelText(cancelBtnText);
+        setShowAlertCancelButton(shouldShowCancelButton); // Cập nhật state này
+        setIsAlertVisible(true);
+    };
 
     // useEffect để xử lý nút back cứng trên Android
     useEffect(() => {
@@ -48,12 +80,12 @@ const RegisterScreen = () => {
 
     const handleRegister = async () => {
         if (!username || !email || !password || !confirmPassword) {
-            Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+            showCustomAlert('Lỗi', 'Mật khẩu xác nhận không khớp');
             return;
         }
 
@@ -66,21 +98,32 @@ const RegisterScreen = () => {
             console.log('Server response:', response);
 
             if (response.ok) {
-                Alert.alert('Thành công', response.data.message || 'Đăng ký thành công!');
-                navigation.navigate('Login');
+                showCustomAlert(
+                    'Thành công',
+                    response.data.message || 'Đăng ký thành công!',
+                    () => {
+                        setIsAlertVisible(false); // Đóng alert
+                        navigation.navigate('Login'); // Điều hướng
+                    },
+                    null, // Không có hàm cancel đặc biệt cho trường hợp này
+                    'OK', // Nút chỉ là 'OK'
+                    'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
+                    false // Rất quan trọng: Không hiển thị nút Hủy
+                );
             } else {
                 const errorMessage = response.data?.error || 'Đăng ký thất bại';
                 setMessage(errorMessage);
-                Alert.alert('Lỗi', errorMessage);
+                showCustomAlert('Lỗi', errorMessage); // Mặc định vẫn có nút hủy nếu là lỗi
             }
         } catch (error) {
             console.error('Error calling register API:', error.message);
             setMessage('Cannot connect to server. Please check connection and try again.');
-            Alert.alert('Lỗi', 'Cannot connect to server. Please check connection and try again.');
+            showCustomAlert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối.');
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <KeyboardAvoidingView
@@ -212,6 +255,18 @@ const RegisterScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Custom Alert Dialog */}
+            <CustomAlertDialog
+                isVisible={isAlertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                onConfirm={alertOnConfirm}
+                onCancel={alertOnCancel}
+                confirmText={alertConfirmText}
+                cancelText={alertCancelText}
+                showCancelButton={showAlertCancelButton} // Truyền prop này vào
+            />
         </KeyboardAvoidingView>
     );
 };
