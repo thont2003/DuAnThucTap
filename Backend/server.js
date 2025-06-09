@@ -14,6 +14,7 @@ const imagesDir = path.join(__dirname, 'public', 'images');
 console.log('Đường dẫn phục vụ ảnh tĩnh:', imagesDir);
 app.use('/images', express.static(imagesDir));
 
+
 // ... your routes ...
 
 // PostgreSQL connection

@@ -62,24 +62,25 @@ const MainTabNavigator = () => {
 
                     if (route.name === 'HomeTab') {
                         iconSource = focused 
-                          ? require('../images/homeblue-icon.png') 
-                          : require('../images/home-icon.png');
+                          ? require('../images/tabbar/homeblue-icon.png') 
+                          : require('../images/tabbar/home-icon.png');
                         
                     } else if (route.name === 'HistoryTab') {
                         iconSource = focused 
-                            ? require('../images/historyblue-icon.png') 
-                            : require('../images/history-icon.png');
+                            ? require('../images/tabbar/historyblue-icon.png') 
+                            : require('../images/tabbar/history-icon.png');
                         
                     } else if (route.name === 'RankingTab') {
                         iconSource = focused 
-                            ? require('../images/rankingblue-icon.png') 
-                            : require('../images/ranking-icon.png');
+                            ? require('../images/tabbar/rankingblue-icon.png') 
+                            : require('../images/tabbar/ranking-icon.png');
                         
                     } else if (route.name === 'AccountTab') {
                         iconSource = focused 
-                            ? require('../images/accountblue-icon.png') 
-                            : require('../images/account-icon.png');
+                            ? require('../images/tabbar/accountblue-icon.png') 
+                            : require('../images/tabbar/account-icon.png');
                     }
+
 
                     return (
                         <>

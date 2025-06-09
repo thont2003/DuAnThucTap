@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+// LoginScreen.js
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    Alert,
     ActivityIndicator,
     Image,
     Dimensions,
@@ -13,11 +13,12 @@ import {
     Platform,
     ScrollView,
     StatusBar,
+    BackHandler,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
-import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
-
+import CustomAlertDialog from '../components/CustomAlertDialog';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // THÊM DÒNG NÀY ĐỂ LƯU userId
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,12 +26,12 @@ const LoginScreen = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
+    // const [message, setMessage] = useState(''); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog cho lỗi
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
     const navigation = useNavigation();
 
-        // State cho Custom Alert
+    // State cho Custom Alert
     const [isAlertVisible, setIsAlertVisible] = useState(false);
     const [alertTitle, setAlertTitle] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
@@ -38,8 +39,7 @@ const LoginScreen = () => {
     const [alertOnCancel, setAlertOnCancel] = useState(() => () => {});
     const [alertConfirmText, setAlertConfirmText] = useState('OK');
     const [alertCancelText, setAlertCancelText] = useState('Hủy');
-    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
-
+    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true);
 
     // Hàm hiển thị Custom Alert
     const showCustomAlert = (
@@ -49,7 +49,7 @@ const LoginScreen = () => {
         cancelAction = null,
         confirmBtnText = 'OK',
         cancelBtnText = 'Hủy',
-        shouldShowCancelButton = true // Mặc định là true
+        shouldShowCancelButton = true
     ) => {
         setAlertTitle(title);
         setAlertMessage(message);
@@ -61,23 +61,51 @@ const LoginScreen = () => {
         setIsAlertVisible(true);
     };
 
+    // --- Cập nhật phần xử lý nút back cứng trên Android ---
+    useEffect(() => {
+        const backAction = () => {
+            navigation.popToTop();
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, [navigation]);
+    // --- Kết thúc cập nhật phần xử lý nút back cứng ---
+
     const handleLogin = async () => {
         if (!email || !password) {
-            showCustomAlert('Lỗi', 'Vui lòng nhập email và mật khẩu'); // Sử dụng Custom Alert
+            showCustomAlert('Lỗi', 'Vui lòng nhập email và mật khẩu');
             return;
         }
 
         setLoading(true);
-        setMessage('');
+        // setMessage(''); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog cho lỗi
+
         try {
             console.log('Sending login request:', { email, password });
             const response = await apiCall('POST', '/login', { email, password });
             console.log('Server response:', response);
 
             if (response.ok) {
-                // Lấy cả 'role' từ phản hồi của server
-                const { message, username: usernameFromApi, role } = response.data;
+                // Lấy cả 'role' và 'userId' từ phản hồi của server
+                const { message, username: usernameFromApi, role, userId } = response.data;
                 const finalUsername = usernameFromApi || email.split('@')[0];
+
+                // --- LƯU userId VÀO ASYNCSTORAGE NGAY SAU KHI ĐĂNG NHẬP THÀNH CÔNG ---
+                if (userId) {
+                    await AsyncStorage.setItem('userId', userId.toString()); // Lưu userId dưới dạng chuỗi
+                    console.log('LoginScreen: userId đã được lưu vào AsyncStorage:', userId);
+                } else {
+                    console.warn('LoginScreen: API response did not contain userId.');
+                    // Tùy chọn: Xử lý trường hợp không có userId trả về
+                    // showCustomAlert('Cảnh báo', 'Không nhận được ID người dùng từ server. Một số tính năng có thể không hoạt động.');
+                }
+                // ------------------------------------------------------------------
 
                 // Logic phân quyền đăng nhập
                 if (role === 'admin') {
@@ -86,47 +114,56 @@ const LoginScreen = () => {
                         message || 'Đăng nhập thành công với quyền Admin!',
                         () => {
                             setIsAlertVisible(false); // Đóng alert
-                            navigation.navigate('AdminScreen', { username: finalUsername }); // Điều hướng đến AdminScreen
+                            // Sử dụng CommonActions.reset để xóa stack và chuyển sang AdminScreen
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [
+                                        { name: 'AdminScreen', params: { username: finalUsername } }
+                                    ],
+                                })
+                            );
                         },
                         null,
                         'OK',
                         'Hủy',
-                        false
+                        false // Không hiển thị nút hủy cho thông báo thành công này
                     );
                 } else if (role === 'user') {
-                    showCustomAlert(
-                        'Thành công',
-                        message || 'Đăng nhập thành công!',
-                        () => {
-                            setIsAlertVisible(false); // Đóng alert
-                            navigation.navigate('MainTabs', {
-                                screen: 'HomeTab', // Tên màn hình của tab Home trong AppNavigator.js
-                                params: { username: finalUsername } // Các tham số vẫn được truyền cho màn hình HomeTab
-                            }); // Điều hướng đến MainTabs (HomeTab)
-                        },
-                        null,
-                        'OK',
-                        'Hủy',
-                        false
+                    // Đối với user, KHÔNG HIỂN THỊ CustomAlertDialog ngay tại đây.
+                    // Thay vào đó, điều hướng trực tiếp và truyền showLoginSuccess: true
+                    // để HomeScreen (trong HomeTab) hiển thị thông báo.
+                    navigation.dispatch(
+                        CommonActions.reset({
+                            index: 0,
+                            routes: [
+                                {
+                                    name: 'MainTabs',
+                                    params: {
+                                        screen: 'HomeTab', // Tên màn hình của tab Home trong AppNavigator.js
+                                        params: { username: finalUsername, showLoginSuccess: true } // Thêm tham số này
+                                    }
+                                }
+                            ],
+                        })
                     );
                 } else {
                     // Trường hợp role không xác định hoặc không hợp lệ
                     const errorMessage = 'Tài khoản của bạn không có quyền truy cập hoặc vai trò không hợp lệ.';
-                    setMessage(errorMessage);
+                    // setMessage(errorMessage); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog
                     showCustomAlert('Lỗi', errorMessage);
                 }
 
             } else {
                 // Xử lý lỗi từ server (ví dụ: email/mật khẩu sai)
                 const errorMessage = response.data?.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.';
-                setMessage(errorMessage);
+                // setMessage(errorMessage); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog
                 showCustomAlert('Lỗi', errorMessage);
             }
-        }
-        catch (error) {
+        } catch (error) {
             console.error('Error calling login API:', error.message);
-            setMessage('Cannot connect to server. Please check connection and try again.');
-            showCustomAlert('Lỗi', 'Cannot connect to server. Please check connection and try again.');
+            // setMessage('Cannot connect to server. Please check connection and try again.'); // Không cần thiết
+            showCustomAlert('Lỗi', 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối và thử lại.');
         } finally {
             setLoading(false);
         }
@@ -145,7 +182,7 @@ const LoginScreen = () => {
                 contentContainerStyle={styles.scrollViewContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.popToTop()}>
                     <Image
                         source={require('../images/login_signup/back.png')}
                         style={styles.backIcon}
@@ -216,7 +253,7 @@ const LoginScreen = () => {
                             )}
                             <Text style={styles.rememberMeText}>Remember me</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => showCustomAlert('Forgot password pressed')}>
+                        <TouchableOpacity onPress={() => showCustomAlert('Thông báo', 'Chức năng Quên mật khẩu đang được phát triển.')}>
                             <Text style={styles.forgotPasswordText}>Forgot password?</Text>
                         </TouchableOpacity>
                     </View>
@@ -233,30 +270,27 @@ const LoginScreen = () => {
                         )}
                     </TouchableOpacity>
 
-                    {message ? <Text style={styles.message}>{message}</Text> : null}
-
                     <View style={styles.signUpContainer}>
                         <Text style={styles.dontHaveAccountText}>
                             Don't have an account?{' '}
                         </Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                        <TouchableOpacity onPress={() => navigation.replace('Register')}>
                             <Text style={styles.signupText}>Signup</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
-            </ScrollView>
 
-             {/* Custom Alert Dialog */}
-            <CustomAlertDialog
-                isVisible={isAlertVisible}
-                title={alertTitle}
-                message={alertMessage}
-                onConfirm={alertOnConfirm}
-                onCancel={alertOnCancel}
-                confirmText={alertConfirmText}
-                cancelText={alertCancelText}
-                showCancelButton={showAlertCancelButton}
-            />
+                <CustomAlertDialog
+                    isVisible={isAlertVisible}
+                    title={alertTitle}
+                    message={alertMessage}
+                    onConfirm={alertOnConfirm}
+                    onCancel={alertOnCancel}
+                    confirmText={alertConfirmText}
+                    cancelText={alertCancelText}
+                    showCancelButton={showAlertCancelButton}
+                />
+            </ScrollView>
         </KeyboardAvoidingView>
     );
 };
