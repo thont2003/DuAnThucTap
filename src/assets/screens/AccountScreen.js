@@ -24,7 +24,7 @@ const AccountScreen = () => {
       console.log('Đã xóa thông tin đăng nhập khỏi AsyncStorage.');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Login' }], // Thay 'Login' bằng tên màn hình đăng nhập của bạn
+        routes: [{ name: 'IntroScreen' }], // Thay 'Login' bằng tên màn hình đăng nhập của bạn
       });
       // Có thể thêm thông báo toast hoặc snackbar thay vì Alert.alert() mặc định
       // Ví dụ: ToastAndroid.show('Bạn đã đăng xuất thành công!', ToastAndroid.SHORT);
@@ -46,7 +46,7 @@ const AccountScreen = () => {
       <View style={styles.userInfoContainer}>
         <View style={styles.profileIconContainer}>
           <Image
-            source={require('../images/history-icon.png')}
+            source={require('../images/profile/avatar.png')}
             style={styles.profileIcon}
           />
         </View>
@@ -59,7 +59,7 @@ const AccountScreen = () => {
         <TouchableOpacity style={styles.optionItem} onPress={handlePressPersonalInfo}>
           <View style={styles.optionIconContainer}>
             <Image
-              source={require('../images/history-icon.png')}
+              source={require('../images/profile/user.png')}
               style={styles.optionIcon}
             />
           </View>
@@ -69,7 +69,7 @@ const AccountScreen = () => {
         <TouchableOpacity style={styles.optionItem} onPress={() => handlePressOtherOption('Đổi mật khẩu')}>
           <View style={styles.optionIconContainer}>
             <Image
-              source={require('../images/history-icon.png')}
+              source={require('../images/profile/reset-password.png')}
               style={styles.optionIcon}
             />
           </View>
@@ -79,7 +79,7 @@ const AccountScreen = () => {
         <TouchableOpacity style={styles.optionItem} onPress={() => handlePressOtherOption('Liên hệ/Hỗ trợ')}>
           <View style={styles.optionIconContainer}>
             <Image
-              source={require('../images/profile/support.jpg')}
+              source={require('../images/profile/support.png')}
               style={styles.optionIcon}
             />
           </View>
@@ -90,7 +90,7 @@ const AccountScreen = () => {
         <TouchableOpacity style={styles.optionItem} onPress={() => setLogoutAlertVisible(true)}>
           <View style={styles.optionIconContainer}>
             <Image
-              source={require('../images/history-icon.png')}
+              source={require('../images/profile/logout.png')}
               style={styles.optionIcon}
             />
           </View>
@@ -170,6 +170,7 @@ const styles = StyleSheet.create({
   },
   optionsList: {
     marginTop: 20,
+    maxHeight: 400,
     marginHorizontal: 15,
     backgroundColor: '#fff',
     borderRadius: 20,

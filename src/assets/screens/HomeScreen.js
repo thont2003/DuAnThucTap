@@ -1,5 +1,6 @@
+// HomeScreen.js
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet, FlatList, StatusBar, Animated } from 'react-native'; // Import Animated
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiCall } from '../utils/api';
@@ -7,16 +8,14 @@ import { BASE_URL } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
-// Danh sách các ảnh banner (thay thế bằng ảnh của bạn)
-// Bạn có thể lấy danh sách này từ API nếu có
 const bannerImages = [
-    require('../images/banner.png'), // Đổi tên hoặc thêm ảnh của bạn
-    require('../images/banner.png'),
-    require('../images/banner.png'),
+    require('../images/home/banner.png'),
+    require('../images/home/banner.png'),
+    require('../images/home/banner.png'),
 ];
 
 const HomeScreen = ({ route }) => {
-    const { username } = route.params || { username: 'Guest' };
+    const { username, showLoginSuccess } = route.params || { username: 'Guest' }; // Nhận tham số showLoginSuccess
     const navigation = useNavigation();
 
     const [levels, setLevels] = useState([]);
@@ -26,6 +25,12 @@ const HomeScreen = ({ route }) => {
     // State và Ref cho banner tự động trượt
     const [bannerIndex, setBannerIndex] = useState(0);
     const flatListRef = useRef(null);
+    const scrollTimeoutRef = useRef(null);
+
+    // State và Animated.Value cho thông báo đăng nhập
+    const [showNotification, setShowNotification] = useState(false);
+    const notificationOpacity = useRef(new Animated.Value(0)).current;
+    const notificationTranslateY = useRef(new Animated.Value(-100)).current;
 
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) {
@@ -67,8 +72,84 @@ const HomeScreen = ({ route }) => {
     useEffect(() => {
         fetchLevels();
 
-        // Logic tự động trượt banner
-        const interval = setInterval(() => {
+        // Khởi tạo timeout tự động trượt banner
+        const startAutoScroll = () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+            scrollTimeoutRef.current = setTimeout(() => {
+                setBannerIndex((prevIndex) => {
+                    const nextIndex = (prevIndex + 1) % bannerImages.length;
+                    if (flatListRef.current) {
+                        flatListRef.current.scrollToIndex({ animated: true, index: nextIndex });
+                    }
+                    return nextIndex;
+                });
+                startAutoScroll(); // Gọi lại để tiếp tục tự động trượt
+            }, 4000); // 4 giây
+        };
+
+        startAutoScroll(); // Bắt đầu tự động trượt khi component mount
+
+        return () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current); // Xóa timeout khi component unmount
+            }
+        };
+    }, []);
+
+    // Effect để xử lý thông báo đăng nhập thành công
+    useEffect(() => {
+        if (showLoginSuccess) {
+            setShowNotification(true);
+            Animated.parallel([
+                Animated.timing(notificationOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(notificationTranslateY, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setTimeout(() => {
+                    Animated.parallel([
+                        Animated.timing(notificationOpacity, {
+                            toValue: 0,
+                            duration: 500,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(notificationTranslateY, {
+                            toValue: -100,
+                            duration: 500,
+                            useNativeDriver: true,
+                        }),
+                    ]).start(() => {
+                        setShowNotification(false);
+                        // Đặt lại tham số route để thông báo không xuất hiện lại khi quay lại HomeScreen
+                        navigation.setParams({ showLoginSuccess: undefined });
+                    });
+                }, 2000); // Hiển thị trong 3 giây
+            });
+        }
+    }, [showLoginSuccess, notificationOpacity, notificationTranslateY, navigation]);
+
+    const handleScroll = (event) => {
+        // Xóa timeout tự động trượt khi người dùng cuộn thủ công
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+
+        const contentOffsetX = event.nativeEvent.contentOffset.x;
+        // Tính toán index dựa trên chiều rộng của mỗi item banner
+        const newIndex = Math.round(contentOffsetX / (width * 0.95));
+        setBannerIndex(newIndex);
+
+        // Đặt lại timeout tự động trượt sau khi người dùng ngừng cuộn
+        // Timeout này sẽ kích hoạt sau 4 giây không có tương tác cuộn
+        scrollTimeoutRef.current = setTimeout(() => {
             setBannerIndex((prevIndex) => {
                 const nextIndex = (prevIndex + 1) % bannerImages.length;
                 if (flatListRef.current) {
@@ -76,11 +157,9 @@ const HomeScreen = ({ route }) => {
                 }
                 return nextIndex;
             });
-        }, 5000); // 3 giây
-
-        // Dọn dẹp interval khi component bị unmount
-        return () => clearInterval(interval);
-    }, []);
+            // startAutoScroll(); // Có thể uncomment nếu muốn tiếp tục tự động trượt từ vị trí mới
+        }, 4000); // 4 giây sau khi người dùng ngừng cuộn
+    };
 
     const renderBannerItem = ({ item }) => (
         <Image source={item} style={homeStyles.bannerImage} />
@@ -88,11 +167,33 @@ const HomeScreen = ({ route }) => {
 
     return (
         <View style={homeStyles.container}>
+            {/* Cấu hình Status Bar */}
+            <StatusBar
+                barStyle="dark-content" // Đặt màu chữ/icon trên Status Bar là màu tối (phù hợp với nền trắng)
+                backgroundColor="white" // Đặt màu nền của Status Bar là trắng
+                translucent={false} // Đảm bảo Status Bar không bị trong suốt và chiếm không gian
+            />
+
             {/* Header */}
             <View style={homeStyles.header}>
                 <Image source={require('../images/home/account.png')} style={homeStyles.avatar} />
                 <Text style={homeStyles.greeting}>Hello, {username}</Text>
             </View>
+
+            {/* Thông báo đăng nhập thành công */}
+            {showNotification && (
+                <Animated.View
+                    style={[
+                        homeStyles.notificationContainer,
+                        {
+                            opacity: notificationOpacity,
+                            transform: [{ translateY: notificationTranslateY }],
+                        },
+                    ]}
+                >
+                    <Text style={homeStyles.notificationText}>Đăng nhập thành công!</Text>
+                </Animated.View>
+            )}
 
             {/* Banner - Sử dụng FlatList */}
             <View style={homeStyles.bannerContainer}>
@@ -104,12 +205,14 @@ const HomeScreen = ({ route }) => {
                     horizontal
                     pagingEnabled
                     showsHorizontalScrollIndicator={false}
+                    onScroll={handleScroll} // Thêm onScroll để theo dõi cuộn thủ công
+                    scrollEventThrottle={16} // Tần suất gọi hàm onScroll (ms)
                     onScrollToIndexFailed={info => {
                         const wait = new Promise(resolve => setTimeout(resolve, 500));
                         wait.then(() => {
-                          flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
                         });
-                      }}
+                    }}
                 />
                 <View style={homeStyles.paginationDots}>
                     {bannerImages.map((_, index) => (
@@ -131,7 +234,7 @@ const HomeScreen = ({ route }) => {
             {loading ? (
                 <View style={homeStyles.loadingContainer}>
                     <ActivityIndicator size="large" color="#1E90FF" />
-                    <Text style={homeStyles.loadingText}>Đang tải levels...</Text>
+                    <Text style={homeStyles.loadingText}>Đang tải danh mục...</Text>
                 </View>
             ) : error ? (
                 <View style={homeStyles.errorContainer}>
@@ -158,7 +261,6 @@ const HomeScreen = ({ route }) => {
                                     resizeMode="contain"
                                     onError={(e) => console.log('Lỗi tải ảnh Level:', e.nativeEvent.error, 'URL:', getFullImageUrl(item.image_url))}
                                 />
-                                <Text style={homeStyles.categoryName}>{item.name}</Text>
                             </View>
                         </TouchableOpacity>
                     ))}
@@ -171,19 +273,20 @@ const HomeScreen = ({ route }) => {
 const homeStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E0E5FF',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'white',
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
         paddingTop: 50,
+        zIndex: 1, // Đảm bảo header nằm trên thông báo
     },
     avatar: {
         width: 50,
@@ -196,7 +299,29 @@ const homeStyles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    // Styles mới cho banner tự động trượt
+    // Styles for the success notification
+    notificationContainer: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 95 : 10, // Adjust based on your header height and status bar
+        width: '70%',
+        alignSelf: 'center',
+        backgroundColor: '#82DA6C', // Green color for success
+        padding: 12,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10, // Ensure it's on top
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    notificationText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
     bannerContainer: {
         width: '95%',
         height: 150,
@@ -204,10 +329,16 @@ const homeStyles = StyleSheet.create({
         marginTop: 15,
         marginBottom: 20,
         borderRadius: 15,
-        overflow: 'hidden', // Đảm bảo ảnh bo góc
+        overflow: 'hidden',
+        backgroundColor: 'white',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
     },
     bannerImage: {
-        width: width * 0.95, // Chiều rộng của mỗi ảnh banner bằng với container
+        width: width * 0.95,
         height: '100%',
         resizeMode: 'cover',
         borderRadius: 15,
@@ -235,6 +366,7 @@ const homeStyles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: 'transparent',
     },
     loadingText: {
         marginTop: 10,
@@ -246,6 +378,7 @@ const homeStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+        backgroundColor: 'transparent',
     },
     errorText: {
         fontSize: 16,
@@ -269,7 +402,7 @@ const homeStyles = StyleSheet.create({
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         paddingHorizontal: 10,
-        paddingBottom: 80,
+        // paddingBottom: 80,
     },
     categoryCardWrapper: {
         width: '48%',
@@ -278,7 +411,7 @@ const homeStyles = StyleSheet.create({
     categoryCard: {
         width: '100%',
         height: 120,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'white',
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
@@ -290,16 +423,9 @@ const homeStyles = StyleSheet.create({
         overflow: 'hidden',
     },
     categoryImage: {
-        width: '80%',
-        height: '70%',
+        width: '90%',
+        height: '90%',
         resizeMode: 'contain',
-        marginBottom: 5,
-    },
-    categoryName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
     },
 });
 

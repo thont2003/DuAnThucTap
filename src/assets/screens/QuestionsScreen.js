@@ -1,4 +1,3 @@
-// screens/QuestionsScreen.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
@@ -9,7 +8,10 @@ import {
     ActivityIndicator,
     ScrollView,
     Alert,
-    Dimensions
+    Dimensions,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
@@ -26,7 +28,8 @@ const QuestionsScreen = () => {
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswerId, setSelectedAnswerId] = useState(null);
-    const [isAnswered, setIsAnswered] = useState(false);
+    const [userTextInput, setUserTextInput] = useState('');
+    const [isAnswered, setIsAnswered] = useState(false); // This state still controls showing feedback/correct answer
     const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -50,13 +53,19 @@ const QuestionsScreen = () => {
             const response = await apiCall('GET', `/tests/${testId}/questions`);
 
             if (response.ok && response.data) {
-                const shuffledQuestions = response.data.map(q => ({
-                    ...q,
-                    answers: q.answers.sort(() => Math.random() - 0.5)
-                }));
+                const shuffledQuestions = response.data.map(q => {
+                    if (q.type_id === 1) { // Only shuffle answers for multiple-choice questions
+                        return {
+                            ...q,
+                            answers: q.answers.sort(() => Math.random() - 0.5)
+                        };
+                    }
+                    return q; // Don't shuffle answers for type_id 2
+                });
                 setQuestions(shuffledQuestions);
                 setCurrentQuestionIndex(0);
                 setSelectedAnswerId(null);
+                setUserTextInput('');
                 setIsAnswered(false);
                 setCorrectAnswersCount(0);
                 setUserAnswersHistory([]);
@@ -82,11 +91,11 @@ const QuestionsScreen = () => {
     }, [testId, fetchQuestions]);
 
     const handleAnswerPress = (answer) => {
-        if (isAnswered) {
+        if (isAnswered) { // Only allow selection if not already answered
             return;
         }
         setSelectedAnswerId(answer.answer_id);
-        setIsAnswered(true);
+        setIsAnswered(true); // Mark as answered immediately after selection
 
         const currentQuestion = questions[currentQuestionIndex];
         const isCorrect = answer.is_correct;
@@ -99,37 +108,130 @@ const QuestionsScreen = () => {
             ...prev,
             {
                 questionId: currentQuestion.question_id,
-                selectedAnswerId: answer.answer_id, // Lưu ID đáp án đã chọn
-                answerText: answer.answer_text,     // Lưu nội dung đáp án đã chọn
+                selectedAnswerId: answer.answer_id,
+                answerText: answer.answer_text,
                 isCorrect: isCorrect,
+                questionType: currentQuestion.type_id,
             }
         ]);
     };
 
-    const handleNextQuestion = async () => {
-        if (!isAnswered) {
-            Alert.alert('Chưa trả lời', 'Bạn phải chọn một đáp án trước khi chuyển câu hỏi.');
+    // This function is called when the user explicitly "submits" the text input (e.g., presses Enter)
+    const handleTextInputSubmit = () => {
+        if (userTextInput.trim() === '') {
+            Alert.alert('Chưa nhập câu trả lời', 'Bạn phải nhập câu trả lời.');
             return;
         }
+        
+        // Only process if not already answered for this question (prevents double counting)
+        if (!isAnswered) { 
+            setIsAnswered(true); // Mark as answered
 
+            const currentQuestion = questions[currentQuestionIndex];
+            const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
+
+            if (isCorrect) {
+                setCorrectAnswersCount(prev => prev + 1);
+            }
+
+            setUserAnswersHistory(prev => [
+                ...prev,
+                {
+                    questionId: currentQuestion.question_id,
+                    selectedAnswerId: null,
+                    answerText: userTextInput.trim(),
+                    isCorrect: isCorrect,
+                    correctAnswerContent: currentQuestion.correct_answer,
+                    questionType: currentQuestion.type_id,
+                }
+            ]);
+        }
+    };
+
+
+    const handleNextQuestion = async () => {
+        const currentQuestion = questions[currentQuestionIndex];
+
+        // For fill-in-the-blank, if user has typed something but not yet "submitted" (isAnswered is false)
+        // We will "submit" it automatically before moving to next.
+        if (currentQuestion.type_id === 2 && userTextInput.trim() !== '' && !isAnswered) {
+             // We need to manually record the answer history for fill-in-the-blank here
+            const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
+            if (isCorrect) {
+                setCorrectAnswersCount(prev => prev + 1);
+            }
+            setUserAnswersHistory(prev => [
+                ...prev,
+                {
+                    questionId: currentQuestion.question_id,
+                    selectedAnswerId: null,
+                    answerText: userTextInput.trim(),
+                    isCorrect: isCorrect,
+                    correctAnswerContent: currentQuestion.correct_answer,
+                    questionType: currentQuestion.type_id,
+                }
+            ]);
+            setIsAnswered(true); // Mark as answered after recording
+        }
+
+        // Now, check if the question is "answered" based on its type
+        let canProceed = false;
+        if (currentQuestion.type_id === 1) { // Multiple Choice
+            canProceed = isAnswered; // Must have selected an answer
+        } else if (currentQuestion.type_id === 2) { // Fill-in-the-blank
+            canProceed = userTextInput.trim() !== ''; // Must have *some* text
+        }
+
+        if (!canProceed) {
+            Alert.alert('Chưa hoàn thành', 'Vui lòng hoàn thành câu trả lời trước khi chuyển câu hỏi.');
+            return;
+        }
+        
+        // If it's answered, proceed
         if (currentQuestionIndex === questions.length - 1) {
             await finishTest();
         } else {
             setCurrentQuestionIndex(prev => prev + 1);
             setSelectedAnswerId(null);
-            setIsAnswered(false);
+            setUserTextInput(''); // Reset text input for the next question
+            setIsAnswered(false); // Reset isAnswered for the next question
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }
     };
 
     const finishTest = async () => {
         setLoading(true);
+        let retrievedUserId = null;
         try {
-            const userId = await AsyncStorage.getItem('userId');
-            if (!userId) {
-                Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
-                // Có thể navigate về màn hình đăng nhập hoặc giới thiệu tùy luồng ứng dụng
-                navigation.replace('Login'); 
+            console.log('QuestionsScreen: Attempting to retrieve userId from AsyncStorage...');
+            retrievedUserId = await AsyncStorage.getItem('userId');
+            console.log('QuestionsScreen: userId retrieved from AsyncStorage:', retrievedUserId);
+
+            if (!retrievedUserId) {
+                Alert.alert(
+                    'Lỗi thông tin người dùng',
+                    'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
+                    [
+                        {
+                            text: 'Đăng nhập lại',
+                            onPress: () => navigation.replace('Login')
+                        },
+                        {
+                            text: 'Hủy',
+                            style: 'cancel',
+                            onPress: () => {
+                                setLoading(false);
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+
+            const userIdInt = parseInt(retrievedUserId, 10);
+            if (isNaN(userIdInt)) {
+                Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
+                navigation.replace('Login');
                 return;
             }
 
@@ -137,7 +239,7 @@ const QuestionsScreen = () => {
             const totalQuestions = questions.length;
 
             const payload = {
-                userId: parseInt(userId),
+                userId: userIdInt,
                 testId: testId,
                 score: totalScore,
                 totalQuestions: totalQuestions,
@@ -157,14 +259,12 @@ const QuestionsScreen = () => {
                         {
                             text: 'Xem lại kết quả',
                             onPress: () => {
-                                // ***** DÒNG ĐÃ SỬA ĐỔI *****
-                                // Thay từ navigation.replace sang navigation.navigate
                                 navigation.navigate('Result', {
                                     testId: testId,
                                     testTitle: testTitle,
                                     totalQuestions: totalQuestions,
                                     correctAnswers: correctAnswersCount,
-                                    totalScore: totalScore,
+                                    totalScore: totalScore, // This is now calculated in ResultScreen
                                     userAnswersHistory: userAnswersHistory,
                                     allQuestions: questions,
                                 });
@@ -224,7 +324,10 @@ const QuestionsScreen = () => {
     const currentQuestion = questions[currentQuestionIndex];
 
     return (
-        <View style={questionsStyles.container}>
+        <KeyboardAvoidingView
+            style={questionsStyles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
             {/* Header */}
             <View style={questionsStyles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backButton}>
@@ -249,59 +352,97 @@ const QuestionsScreen = () => {
                 )}
                 {/* TODO: Add audio player if audio_path exists */}
 
-                {/* Answers */}
+                {/* Answers or Text Input based on type_id */}
                 <View style={questionsStyles.answersContainer}>
-                    {currentQuestion.answers.map((answer) => {
-                        const isSelected = selectedAnswerId === answer.answer_id;
-                        const isCorrectAnswer = answer.is_correct;
+                    {currentQuestion.type_id === 1 ? ( // Multiple Choice
+                        currentQuestion.answers.map((answer) => {
+                            const isSelected = selectedAnswerId === answer.answer_id;
+                            const isCorrectAnswer = answer.is_correct;
 
-                        let answerButtonColor = '#F0F0F0';
-                        let answerTextColor = '#333';
-                        if (isAnswered) {
-                            if (isCorrectAnswer) {
-                                answerButtonColor = '#4CAF50';
-                                answerTextColor = '#FFFFFF';
-                            } else if (isSelected && !isCorrectAnswer) {
-                                answerButtonColor = '#F44336';
-                                answerTextColor = '#FFFFFF';
+                            let answerButtonColor = '#F0F0F0';
+                            let answerTextColor = '#333';
+                            if (isAnswered) { // Only apply feedback colors if question is answered
+                                if (isCorrectAnswer) {
+                                    answerButtonColor = '#4CAF50';
+                                    answerTextColor = '#FFFFFF';
+                                } else if (isSelected && !isCorrectAnswer) {
+                                    answerButtonColor = '#F44336';
+                                    answerTextColor = '#FFFFFF';
+                                }
+                            } else if (isSelected) { // Only show selected color if not answered yet
+                                answerButtonColor = '#BBDEFB';
+                                answerTextColor = '#1E90FF';
                             }
-                        } else if (isSelected) {
-                            answerButtonColor = '#BBDEFB';
-                            answerTextColor = '#1E90FF';
-                        }
 
-                        return (
-                            <TouchableOpacity
-                                key={answer.answer_id.toString()}
-                                style={[
-                                    questionsStyles.answerButton,
-                                    { backgroundColor: answerButtonColor }
-                                ]}
-                                onPress={() => handleAnswerPress(answer)}
-                                disabled={isAnswered}
-                            >
-                                <Text style={[questionsStyles.answerText, { color: answerTextColor }]}>
-                                    {answer.answer_text}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
+                            return (
+                                <TouchableOpacity
+                                    key={answer.answer_id.toString()}
+                                    style={[
+                                        questionsStyles.answerButton,
+                                        { backgroundColor: answerButtonColor }
+                                    ]}
+                                    onPress={() => handleAnswerPress(answer)}
+                                    disabled={isAnswered} // Disable after answer is chosen
+                                >
+                                    <Text style={[questionsStyles.answerText, { color: answerTextColor }]}>
+                                        {answer.answer_text}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })
+                    ) : ( // Fill-in-the-blank (type_id = 2)
+                        <View style={questionsStyles.textInputContainer}>
+                            <TextInput
+                                style={questionsStyles.textInputField}
+                                placeholder="Nhập câu trả lời của bạn..."
+                                value={userTextInput}
+                                onChangeText={setUserTextInput}
+                                editable={!isAnswered} // Disable input after answered
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                onSubmitEditing={handleTextInputSubmit} // Still useful for explicit submit
+                                returnKeyType="done"
+                            />
+                            {isAnswered && ( // Show feedback only if isAnswered is true (meaning handleTextInputSubmit ran)
+                                <View style={questionsStyles.feedbackContainer}>
+                                    <Text style={[
+                                        questionsStyles.feedbackText,
+                                        userAnswersHistory[userAnswersHistory.length - 1]?.isCorrect ? questionsStyles.correctFeedback : questionsStyles.incorrectFeedback
+                                    ]}>
+                                        {userAnswersHistory[userAnswersHistory.length - 1]?.isCorrect ? 'Đúng!' : `Sai! Đáp án đúng: ${currentQuestion.correct_answer}`}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
             {/* Navigation Button */}
             <View style={questionsStyles.navigationButtonContainer}>
                 <TouchableOpacity
-                    style={[questionsStyles.nextButton, !isAnswered && questionsStyles.nextButtonDisabled]}
+                    style={[
+                        questionsStyles.nextButton,
+                        // Disabled if:
+                        // - Multiple Choice AND not yet answered OR
+                        // - Fill-in-the-blank AND text input is empty
+                        (currentQuestion.type_id === 1 && !isAnswered) ||
+                        (currentQuestion.type_id === 2 && userTextInput.trim() === '')
+                            ? questionsStyles.nextButtonDisabled
+                            : null
+                    ]}
                     onPress={handleNextQuestion}
-                    disabled={!isAnswered}
+                    disabled={
+                        (currentQuestion.type_id === 1 && !isAnswered) ||
+                        (currentQuestion.type_id === 2 && userTextInput.trim() === '')
+                    }
                 >
                     <Text style={questionsStyles.nextButtonText}>
                         {currentQuestionIndex === questions.length - 1 ? 'Hoàn thành' : 'Câu hỏi tiếp theo'}
                     </Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -323,6 +464,10 @@ const questionsStyles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         zIndex: 1,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
     },
     backButton: {
         padding: 5,
@@ -343,7 +488,7 @@ const questionsStyles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
         paddingTop: 20,
-        marginTop: 80, 
+        marginTop: 110,
     },
     questionText: {
         fontSize: 22,
@@ -386,6 +531,37 @@ const questionsStyles = StyleSheet.create({
         fontWeight: '500',
         color: '#333',
         textAlign: 'center',
+    },
+    textInputContainer: {
+        marginBottom: 10,
+    },
+    textInputField: {
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        fontSize: 18,
+        color: '#333',
+        minHeight: 50,
+    },
+    feedbackContainer: {
+        marginTop: 10,
+        padding: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    feedbackText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    correctFeedback: {
+        color: '#28A745',
+    },
+    incorrectFeedback: {
+        color: '#DC3545',
     },
     navigationButtonContainer: {
         padding: 20,

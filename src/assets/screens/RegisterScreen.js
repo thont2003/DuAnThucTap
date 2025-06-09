@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    Alert,
+    // Alert, // Không cần Alert mặc định nữa
     ActivityIndicator,
     Image,
     Dimensions,
@@ -27,11 +27,11 @@ const RegisterScreen = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
+    // const [message, setMessage] = useState(''); // Comment hoặc xóa vì dùng CustomAlertDialog
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const navigation = useNavigation();
-    
+
     // State cho Custom Alert
     const [isAlertVisible, setIsAlertVisible] = useState(false);
     const [alertTitle, setAlertTitle] = useState('');
@@ -42,8 +42,7 @@ const RegisterScreen = () => {
     const [alertCancelText, setAlertCancelText] = useState('Hủy');
     const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
 
-     // Hàm hiển thị Custom Alert
-    // Thêm showCancelButton vào tham số
+    // Hàm hiển thị Custom Alert
     const showCustomAlert = (
         title,
         message,
@@ -59,15 +58,17 @@ const RegisterScreen = () => {
         setAlertOnCancel(() => cancelAction ? cancelAction : () => setIsAlertVisible(false));
         setAlertConfirmText(confirmBtnText);
         setAlertCancelText(cancelBtnText);
-        setShowAlertCancelButton(shouldShowCancelButton); // Cập nhật state này
+        setShowAlertCancelButton(shouldShowCancelButton);
         setIsAlertVisible(true);
     };
 
-    // useEffect để xử lý nút back cứng trên Android
+    // --- Cập nhật phần xử lý nút back cứng trên Android ---
     useEffect(() => {
         const backAction = () => {
-            navigation.navigate('IntroScreen'); // Điều hướng về IntroScreen
-            return true; // Trả về true để ngăn hành vi mặc định của nút back
+            // Khi nhấn nút back cứng, chúng ta sẽ pop về màn hình đầu tiên (IntroScreen)
+            // để đảm bảo hiệu ứng pop nhất quán và tránh vòng lặp.
+            navigation.popToTop();
+            return true; // Ngăn hành vi mặc định của nút back
         };
 
         const backHandler = BackHandler.addEventListener(
@@ -76,7 +77,8 @@ const RegisterScreen = () => {
         );
 
         return () => backHandler.remove(); // Hủy đăng ký listener khi component unmount
-    }, [navigation]); // Dependency array: chỉ chạy lại effect khi navigation thay đổi
+    }, [navigation]);
+    // --- Kết thúc cập nhật phần xử lý nút back cứng ---
 
     const handleRegister = async () => {
         if (!username || !email || !password || !confirmPassword) {
@@ -90,7 +92,7 @@ const RegisterScreen = () => {
         }
 
         setLoading(true);
-        setMessage('');
+        // setMessage(''); // Không cần reset message nữa
 
         try {
             console.log('Sending registration request:', { username, email, password });
@@ -103,27 +105,28 @@ const RegisterScreen = () => {
                     response.data.message || 'Đăng ký thành công!',
                     () => {
                         setIsAlertVisible(false); // Đóng alert
-                        navigation.navigate('Login'); // Điều hướng
+                        // Khi đăng ký thành công, thay thế RegisterScreen bằng LoginScreen
+                        // để người dùng không thể back lại RegisterScreen một cách không mong muốn
+                        navigation.replace('Login'); // Sử dụng replace thay vì navigate
                     },
                     null, // Không có hàm cancel đặc biệt cho trường hợp này
-                    'OK', // Nút chỉ là 'OK'
+                    'OK',
                     'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
                     false // Rất quan trọng: Không hiển thị nút Hủy
                 );
             } else {
                 const errorMessage = response.data?.error || 'Đăng ký thất bại';
-                setMessage(errorMessage);
+                // setMessage(errorMessage); // Không cần set message nữa
                 showCustomAlert('Lỗi', errorMessage); // Mặc định vẫn có nút hủy nếu là lỗi
             }
         } catch (error) {
             console.error('Error calling register API:', error.message);
-            setMessage('Cannot connect to server. Please check connection and try again.');
+            // setMessage('Cannot connect to server. Please check connection and try again.'); // Không cần set message nữa
             showCustomAlert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối.');
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <KeyboardAvoidingView
@@ -138,7 +141,8 @@ const RegisterScreen = () => {
                 contentContainerStyle={styles.scrollViewContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('IntroScreen')}>
+                {/* Cập nhật onPress của nút back trên UI để dùng popToTop() */}
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.popToTop()}>
                     <Image
                         source={require('../images/login_signup/back.png')}
                         style={styles.backIcon}
@@ -243,13 +247,15 @@ const RegisterScreen = () => {
                         )}
                     </TouchableOpacity>
 
-                    {message ? <Text style={styles.message}>{message}</Text> : null}
+                    {/* Dòng hiển thị message đã được xóa hoặc comment */}
+                    {/* {message ? <Text style={styles.message}>{message}</Text> : null} */}
 
                     <View style={styles.signUpContainer}>
                         <Text style={styles.dontHaveAccountText}>
                             Already have an account?{' '}
                         </Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                        {/* Cập nhật onPress của nút Login để dùng replace */}
+                        <TouchableOpacity onPress={() => navigation.replace('Login')}>
                             <Text style={styles.signupText}>Login</Text>
                         </TouchableOpacity>
                     </View>
@@ -265,7 +271,7 @@ const RegisterScreen = () => {
                 onCancel={alertOnCancel}
                 confirmText={alertConfirmText}
                 cancelText={alertCancelText}
-                showCancelButton={showAlertCancelButton} // Truyền prop này vào
+                showCancelButton={showAlertCancelButton}
             />
         </KeyboardAvoidingView>
     );
@@ -275,7 +281,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#e0e8ff',
-        paddingTop: Platform.OS === 'ios' ? StatusBar.currentHeight || 0 : 0, 
+        paddingTop: Platform.OS === 'ios' ? StatusBar.currentHeight || 0 : 0,
     },
     scrollViewContent: {
         flexGrow: 1,
@@ -423,7 +429,7 @@ const styles = StyleSheet.create({
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', 
+        justifyContent: 'center',
         paddingHorizontal: 25,
     },
     dontHaveAccountText: {
@@ -435,7 +441,7 @@ const styles = StyleSheet.create({
         color: '#ff5c5c',
         fontWeight: 'bold',
     },
-    message: {
+    message: { // Có thể xóa hoàn toàn style này nếu không còn sử dụng `message` state
         marginTop: 20,
         fontSize: 16,
         color: 'red',

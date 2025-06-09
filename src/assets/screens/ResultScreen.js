@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { BASE_URL } from '../utils/constants'; // Đảm bảo BASE_URL đã được định nghĩa
+import { BASE_URL } from '../utils/constants';
 
 // Cần cho LayoutAnimation trên Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -15,8 +15,7 @@ const ResultScreen = () => {
         testId,
         testTitle,
         totalQuestions,
-        correctAnswers, // Đây là số câu đúng
-        // totalScore,    // TẠM THỜI BỎ totalScore TRUYỀN TỪ route.params ĐỂ TÍNH LẠI CHÍNH XÁC
+        correctAnswers,
         userAnswersHistory, // Lịch sử câu trả lời của người dùng
         allQuestions // Tất cả câu hỏi gốc
     } = route.params;
@@ -46,17 +45,28 @@ const ResultScreen = () => {
         return `${BASE_URL}/images/${imageFileName}`;
     };
 
-    const getCorrectAnswerForQuestion = (questionId) => {
-        const question = allQuestions.find(q => q.question_id === questionId);
-        if (question && question.answers) {
+    // Modified to handle both question types
+    const getCorrectAnswerDisplay = (question) => {
+        if (question.type_id === 1) { // Multiple Choice
             const correctAnswerObj = question.answers.find(a => a.is_correct);
             return correctAnswerObj ? correctAnswerObj.answer_text : 'Không tìm thấy đáp án đúng';
+        } else if (question.type_id === 2) { // Fill-in-the-blank
+            return question.correct_answer || 'Không tìm thấy đáp án đúng';
         }
         return 'Không tìm thấy đáp án đúng';
     };
 
+    const getUserAnswerDisplay = (questionId) => {
+        const userAnswer = userAnswersHistory.find(ans => ans.questionId === questionId);
+        if (!userAnswer) return 'Chưa trả lời';
+
+        // For type_id 1 (multiple choice), answerText is the text of the selected option
+        // For type_id 2 (fill-in-the-blank), answerText is the user's typed input
+        return userAnswer.answerText;
+    };
+
+
     const toggleShowIncorrectOnly = () => {
-        // Sử dụng LayoutAnimation để tạo hiệu ứng chuyển đổi mượt mà
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowIncorrectOnly(prev => !prev);
     };
@@ -77,7 +87,6 @@ const ResultScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <Text style={styles.testTitle}>{testTitle}</Text>
                 <Text style={styles.summaryText}>Số câu đúng: {correctAnswers}/{totalQuestions}</Text>
-                {/* HIỂN THỊ ĐIỂM TRÊN THANG 10 SỬ DỤNG calculatedScore */}
                 <Text style={styles.summaryText}>Điểm của bạn: {formattedScore}/10</Text>
 
                 <View style={styles.divider} />
@@ -102,8 +111,8 @@ const ResultScreen = () => {
                     questionsToDisplay.map((question, index) => {
                         const userAnswer = userAnswersHistory.find(ans => ans.questionId === question.question_id);
                         const isUserCorrect = userAnswer ? userAnswer.isCorrect : false;
-                        const selectedAnswerText = userAnswer ? userAnswer.answerText : 'Chưa trả lời'; // Đảm bảo lấy đúng trường answerText
-                        const correctAnswerText = getCorrectAnswerForQuestion(question.question_id);
+                        const userSelectedAnswerText = getUserAnswerDisplay(question.question_id); // Get user's answer
+                        const correctAnswerDisplay = getCorrectAnswerDisplay(question); // Get correct answer based on type
 
                         return (
                             <View key={question.question_id} style={styles.questionItem}>
@@ -116,28 +125,36 @@ const ResultScreen = () => {
                                         onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(question.image_path))}
                                     />
                                 )}
+                                {/* Display User's Answer */}
                                 <Text style={styles.answerStatusText(isUserCorrect)}>
-                                    Bạn đã chọn: {selectedAnswerText} {isUserCorrect ? '✔️' : '❌'}
+                                    Bạn đã trả lời: {userSelectedAnswerText} {isUserCorrect ? '✔️' : '❌'}
                                 </Text>
+
+                                {/* Display Correct Answer if User was Incorrect */}
                                 {!isUserCorrect && (
-                                    <Text style={styles.correctAnswerText}>Đáp án đúng: {correctAnswerText}</Text>
+                                    <Text style={styles.correctAnswerText}>Đáp án đúng: {correctAnswerDisplay}</Text>
                                 )}
 
-                                {/* Hiển thị tất cả các lựa chọn đáp án */}
-                                <View style={styles.optionsContainer}>
-                                    {question.answers.map(answer => (
-                                        <Text
-                                            key={answer.answer_id}
-                                            style={[
-                                                styles.optionText,
-                                                answer.is_correct && styles.correctOption, // Đáp án đúng luôn có màu xanh
-                                                userAnswer && userAnswer.selectedAnswerId === answer.answer_id && !answer.is_correct && styles.wrongOption, // Nếu người dùng chọn sai đáp án này
-                                            ]}
-                                        >
-                                            {answer.answer_text}
-                                        </Text>
-                                    ))}
-                                </View>
+                                {/* Conditionally render answer options only for multiple-choice */}
+                                {question.type_id === 1 && (
+                                    <View style={styles.optionsContainer}>
+                                        {question.answers.map(answer => {
+                                            const isThisSelectedByUser = userAnswer && userAnswer.selectedAnswerId === answer.answer_id;
+                                            return (
+                                                <Text
+                                                    key={answer.answer_id}
+                                                    style={[
+                                                        styles.optionText,
+                                                        answer.is_correct && styles.correctOption,
+                                                        isThisSelectedByUser && !answer.is_correct && styles.wrongOption,
+                                                    ]}
+                                                >
+                                                    {answer.answer_text}
+                                                </Text>
+                                            );
+                                        })}
+                                    </View>
+                                )}
                             </View>
                         );
                     })
@@ -148,7 +165,7 @@ const ResultScreen = () => {
 
             <TouchableOpacity
                 style={styles.backToTestsButton}
-                onPress={() => navigation.pop(2)} // Quay lại màn hình TestScreen
+                onPress={() => navigation.pop(2)}
             >
                 <Text style={styles.backToTestsButtonText}>Quay lại danh sách bài tập</Text>
             </TouchableOpacity>
