@@ -69,38 +69,61 @@ const LoginScreen = () => {
 
         setLoading(true);
         setMessage('');
-
         try {
             console.log('Sending login request:', { email, password });
             const response = await apiCall('POST', '/login', { email, password });
             console.log('Server response:', response);
 
             if (response.ok) {
-                const { message, username: usernameFromApi } = response.data;
+                // Lấy cả 'role' từ phản hồi của server
+                const { message, username: usernameFromApi, role } = response.data;
                 const finalUsername = usernameFromApi || email.split('@')[0];
 
-                showCustomAlert(
-                    'Thành công',
-                    message || 'Đăng nhập thành công!',
-                    () => {
-                        setIsAlertVisible(false); // Đóng alert
-                        navigation.navigate('MainTabs', {
-                            screen: 'HomeTab', // Tên màn hình của tab Home trong AppNavigator.js
-                            params: { username: finalUsername } // Các tham số vẫn được truyền cho màn hình HomeTab
-                        }); // Điều hướng
-                    },
-                    null, // Không có hàm cancel đặc biệt
-                    'OK',
-                    'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
-                    false // Không hiển thị nút Hủy
-                );
+                // Logic phân quyền đăng nhập
+                if (role === 'admin') {
+                    showCustomAlert(
+                        'Thành công',
+                        message || 'Đăng nhập thành công với quyền Admin!',
+                        () => {
+                            setIsAlertVisible(false); // Đóng alert
+                            navigation.navigate('AdminScreen', { username: finalUsername }); // Điều hướng đến AdminScreen
+                        },
+                        null,
+                        'OK',
+                        'Hủy',
+                        false
+                    );
+                } else if (role === 'user') {
+                    showCustomAlert(
+                        'Thành công',
+                        message || 'Đăng nhập thành công!',
+                        () => {
+                            setIsAlertVisible(false); // Đóng alert
+                            navigation.navigate('MainTabs', {
+                                screen: 'HomeTab', // Tên màn hình của tab Home trong AppNavigator.js
+                                params: { username: finalUsername } // Các tham số vẫn được truyền cho màn hình HomeTab
+                            }); // Điều hướng đến MainTabs (HomeTab)
+                        },
+                        null,
+                        'OK',
+                        'Hủy',
+                        false
+                    );
+                } else {
+                    // Trường hợp role không xác định hoặc không hợp lệ
+                    const errorMessage = 'Tài khoản của bạn không có quyền truy cập hoặc vai trò không hợp lệ.';
+                    setMessage(errorMessage);
+                    showCustomAlert('Lỗi', errorMessage);
+                }
 
             } else {
-                const errorMessage = response.data?.error || 'Đăng nhập thất bại';
+                // Xử lý lỗi từ server (ví dụ: email/mật khẩu sai)
+                const errorMessage = response.data?.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.';
                 setMessage(errorMessage);
-                Alert.alert('Lỗi', errorMessage);
+                showCustomAlert('Lỗi', errorMessage);
             }
-        } catch (error) {
+        }
+        catch (error) {
             console.error('Error calling login API:', error.message);
             setMessage('Cannot connect to server. Please check connection and try again.');
             showCustomAlert('Lỗi', 'Cannot connect to server. Please check connection and try again.');

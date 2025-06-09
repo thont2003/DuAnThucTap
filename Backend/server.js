@@ -85,10 +85,12 @@ app.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Mật khẩu không đúng' });
     }
 
+    // Trả về role và username
     res.status(200).json({ 
       message: 'Đăng nhập thành công', 
       userId: user.id,
-      username: user.username // Trả về username sau khi đăng nhập thành công
+      username: user.username,
+      role: user.role // Thêm dòng này để trả về quyền (admin/user)
     });
   } catch (err) {
     console.error('Lỗi đăng nhập:', err);
@@ -259,6 +261,171 @@ app.post('/history', async (req, res) => {
         res.status(500).json({ error: 'Lỗi server nội bộ khi lưu kết quả bài làm.' });
     }
 });
+
+
+////////////////////
+
+
+
+app.get('/levels', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT level_id, name, image_url  FROM levels ORDER BY level_id ASC');
+        res.status(200).json(result.rows);
+    } catch (err) {
+      console.error('Lỗi khi lấy danh sách levels:', err);
+        res.status(500).json({ error: 'Lỗi server, không thể lấy dữ liệu levels.' });
+    }
+});
+
+
+
+//TRƯỜNG THÊM SỬA LẤY LEVEL
+// POST /levels - Tạo level mới
+app.post('/levels', async (req, res) => {
+    const { name, image } = req.body;  // nhận cả ảnh
+
+    try {
+        const result = await pool.query(
+            'INSERT INTO levels (name, image_url) VALUES ($1, $2) RETURNING *',
+            [name, image]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Lỗi thêm cấp độ:', err);
+        res.status(500).json({ error: 'Lỗi server khi thêm cấp độ' });
+    }
+});
+
+// Sửa level
+app.put('/levels', async (req, res) => {
+    const { level_id, name, image } = req.body;
+
+    if (!level_id) {
+        return res.status(400).json({ error: 'Thiếu level_id để sửa' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE levels SET name = $1, image_url = $2 WHERE level_id = $3 RETURNING *',
+            [name, image, level_id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Cấp độ không tồn tại' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Lỗi sửa cấp độ:', err);
+        res.status(500).json({ error: 'Lỗi server khi sửa cấp độ' });
+    }
+});
+
+
+// Xóa level
+app.delete('/levels', async (req, res) => {
+    const { id } = req.body;  // id truyền từ frontend thực ra là level_id
+    try {
+        // Sử dụng tên cột đúng là level_id thay vì id
+        const result = await pool.query(
+            'DELETE FROM levels WHERE level_id = $1 RETURNING *',
+            [id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Cấp độ không tồn tại' });
+        }
+
+        res.json({ deletedLevel: result.rows[0] });
+    } catch (err) {
+        console.error('Lỗi xóa cấp độ:', err);
+        res.status(500).json({ error: 'Lỗi server khi xóa cấp độ' });
+    }
+});
+
+// Lấy danh sách tất cả unit
+app.get('/units', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT unit_id, level_id, title, image_url FROM units ORDER BY unit_id ASC'
+        );
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error('Lỗi khi lấy danh sách units:', err);
+        res.status(500).json({ error: 'Lỗi server, không thể lấy dữ liệu units.' });
+    }
+});
+
+// Thêm unit mới
+app.post('/units', async (req, res) => {
+    const { level_id, title, image_url } = req.body;
+
+    if (!level_id || !title) {
+        return res.status(400).json({ error: 'Thiếu level_id hoặc title' });
+    }
+
+    try {
+        const result = await pool.query(
+            'INSERT INTO units (level_id, title, image_url) VALUES ($1, $2, $3) RETURNING *',
+            [level_id, title, image_url]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Lỗi thêm unit:', err);
+        res.status(500).json({ error: 'Lỗi server khi thêm unit' });
+    }
+});
+
+// Sửa unit theo id
+app.put('/units/:id', async (req, res) => {
+    const unit_id = parseInt(req.params.id);
+    const { level_id, title, image_url } = req.body;
+
+    if (!level_id || !title) {
+        return res.status(400).json({ error: 'Thiếu level_id hoặc title' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE units SET level_id = $1, title = $2, image_url = $3 WHERE unit_id = $4 RETURNING *',
+            [level_id, title, image_url, unit_id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Unit không tồn tại' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Lỗi sửa unit:', err);
+        res.status(500).json({ error: 'Lỗi server khi sửa unit' });
+    }
+});
+
+// Xóa unit theo id
+app.delete('/units/:id', async (req, res) => {
+    const unit_id = parseInt(req.params.id);
+
+    try {
+        const result = await pool.query(
+            'DELETE FROM units WHERE unit_id = $1 RETURNING *',
+            [unit_id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Unit không tồn tại' });
+        }
+
+        res.json({ deletedUnit: result.rows[0] });
+    } catch (err) {
+        console.error('Lỗi xóa unit:', err);
+        res.status(500).json({ error: 'Lỗi server khi xóa unit' });
+    }
+});
+
+
+
+
 
 app.listen(3000, () => {
   console.log('✅ Server is running at http://localhost:3000');

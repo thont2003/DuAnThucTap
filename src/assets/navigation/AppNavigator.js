@@ -21,6 +21,9 @@ import QuestionsScreen from '../screens/QuestionsScreen';
 import ResultScreen from '../screens/ResultScreen';
 import DragAndDropScreen from '../screens/DragAndDropScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import AdminScreen from '../screens/admin/AdminScreen';
+import LevelScreen from '../screens/admin/LevelScreen';
+import UnitScreen from '../screens/admin/UnitScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator(); // Define Tab navigator here
@@ -165,6 +168,21 @@ const AppNavigator = () => {
                   name="EditProfileScreen"
                   component={EditProfileScreen}
                   options={{ headerShown: false }}
+                />
+                    <Stack.Screen
+                    name="AdminScreen"
+                    component={AdminScreen}
+                    options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                    name="LevelScreen"
+                    component={LevelScreen}
+                    options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                    name="UnitScreen"
+                    component={UnitScreen}
+                    options={{ headerShown: false }}
                 />
             </Stack.Navigator>
         </NavigationContainer>
