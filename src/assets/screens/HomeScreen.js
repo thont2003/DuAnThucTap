@@ -1,14 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage để lấy username
-import { apiCall } from '../utils/api'; // Đảm bảo đường dẫn này đúng
-import { BASE_URL } from '../utils/constants'; // Đảm bảo đường dẫn này đúng và BASE_URL được định nghĩa
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiCall } from '../utils/api';
+import { BASE_URL } from '../utils/constants';
 
-const { width } = Dimensions.get('window'); // Lấy chiều rộng màn hình để tính toán kích thước category
+const { width } = Dimensions.get('window');
+
+// Danh sách các ảnh banner (thay thế bằng ảnh của bạn)
+// Bạn có thể lấy danh sách này từ API nếu có
+const bannerImages = [
+    require('../images/banner.png'), // Đổi tên hoặc thêm ảnh của bạn
+    require('../images/banner.png'),
+    require('../images/banner.png'),
+];
 
 const HomeScreen = ({ route }) => {
-    // Lấy username từ route.params hoặc từ AsyncStorage
     const { username } = route.params || { username: 'Guest' };
     const navigation = useNavigation();
 
@@ -16,21 +23,19 @@ const HomeScreen = ({ route }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Hàm để xây dựng URL ảnh đầy đủ (sao chép từ UnitsScreen.js)
+    // State và Ref cho banner tự động trượt
+    const [bannerIndex, setBannerIndex] = useState(0);
+    const flatListRef = useRef(null);
+
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) {
-            return ''; // Trả về rỗng nếu không có tên file
+            return '';
         }
-        // Nếu imageFileName đã là một URL đầy đủ, trả về nó trực tiếp.
         if (imageFileName.startsWith('http://') || imageFileName.startsWith('https://')) {
             return imageFileName;
         }
-        // Nếu không, nối nó với base URL và thư mục images.
         return `${BASE_URL}/images/${imageFileName}`;
     };
-
-    // useEffect để lấy username từ AsyncStorage khi component mount
-
 
     const fetchLevels = async () => {
         setLoading(true);
@@ -41,7 +46,6 @@ const HomeScreen = ({ route }) => {
             console.log('HomeScreen: Phản hồi API levels:', response);
 
             if (response.ok) {
-                // Sử dụng image_url trực tiếp từ database
                 const fetchedLevels = response.data;
                 setLevels(fetchedLevels);
                 console.log('HomeScreen: Levels đã được tải thành công:', fetchedLevels.length, 'levels.');
@@ -62,14 +66,25 @@ const HomeScreen = ({ route }) => {
 
     useEffect(() => {
         fetchLevels();
+
+        // Logic tự động trượt banner
+        const interval = setInterval(() => {
+            setBannerIndex((prevIndex) => {
+                const nextIndex = (prevIndex + 1) % bannerImages.length;
+                if (flatListRef.current) {
+                    flatListRef.current.scrollToIndex({ animated: true, index: nextIndex });
+                }
+                return nextIndex;
+            });
+        }, 5000); // 3 giây
+
+        // Dọn dẹp interval khi component bị unmount
+        return () => clearInterval(interval);
     }, []);
 
-    const navItems = [
-        { label: 'Home', icon: require('../images/homeblue-icon.png'), route: 'Home' },
-        { label: 'History', icon: require('../images/history-icon.png'), route: 'History' },
-        { label: 'Ranking', icon: require('../images/ranking-icon.png'), route: 'Ranking' },
-        { label: 'Account', icon: require('../images/account-icon.png'), route: 'Account' },
-    ];
+    const renderBannerItem = ({ item }) => (
+        <Image source={item} style={homeStyles.bannerImage} />
+    );
 
     return (
         <View style={homeStyles.container}>
@@ -79,8 +94,35 @@ const HomeScreen = ({ route }) => {
                 <Text style={homeStyles.greeting}>Hello, {username}</Text>
             </View>
 
-            {/* Banner */}
-            <Image source={require('../images/banner.png')} style={homeStyles.banner} />
+            {/* Banner - Sử dụng FlatList */}
+            <View style={homeStyles.bannerContainer}>
+                <FlatList
+                    ref={flatListRef}
+                    data={bannerImages}
+                    renderItem={renderBannerItem}
+                    keyExtractor={(item, index) => index.toString()}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScrollToIndexFailed={info => {
+                        const wait = new Promise(resolve => setTimeout(resolve, 500));
+                        wait.then(() => {
+                          flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                        });
+                      }}
+                />
+                <View style={homeStyles.paginationDots}>
+                    {bannerImages.map((_, index) => (
+                        <View
+                            key={index}
+                            style={[
+                                homeStyles.dot,
+                                { backgroundColor: index === bannerIndex ? '#1E90FF' : '#C0C0C0' },
+                            ]}
+                        />
+                    ))}
+                </View>
+            </View>
 
             {/* Categories Title */}
             <Text style={homeStyles.categoriesTitle}>Categories</Text>
@@ -111,35 +153,17 @@ const HomeScreen = ({ route }) => {
                         >
                             <View style={homeStyles.categoryCard}>
                                 <Image
-                                    source={{ uri: getFullImageUrl(item.image_url) }} // SỬ DỤNG getFullImageUrl
+                                    source={{ uri: getFullImageUrl(item.image_url) }}
                                     style={homeStyles.categoryImage}
                                     resizeMode="contain"
                                     onError={(e) => console.log('Lỗi tải ảnh Level:', e.nativeEvent.error, 'URL:', getFullImageUrl(item.image_url))}
                                 />
+                                <Text style={homeStyles.categoryName}>{item.name}</Text>
                             </View>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
             )}
-
-            {/* Bottom Navigation */}
-            <View style={homeStyles.bottomNav}>
-                {navItems.map((item, index) => (
-                    <TouchableOpacity
-                        key={index}
-                        onPress={() => navigation.navigate(item.route)}
-                        style={homeStyles.bottomNavItem}
-                    >
-                        <Image
-                            source={item.icon}
-                            style={homeStyles.bottomNavIcon}
-                        />
-                        <Text style={homeStyles.bottomNavText}>
-                            {item.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
         </View>
     );
 };
@@ -159,7 +183,7 @@ const homeStyles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
-        paddingTop: 50, // Để tránh notch
+        paddingTop: 50,
     },
     avatar: {
         width: 50,
@@ -172,21 +196,40 @@ const homeStyles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    banner: {
+    // Styles mới cho banner tự động trượt
+    bannerContainer: {
         width: '95%',
         height: 150,
-        borderRadius: 15,
         alignSelf: 'center',
         marginTop: 15,
         marginBottom: 20,
+        borderRadius: 15,
+        overflow: 'hidden', // Đảm bảo ảnh bo góc
+    },
+    bannerImage: {
+        width: width * 0.95, // Chiều rộng của mỗi ảnh banner bằng với container
+        height: '100%',
         resizeMode: 'cover',
+        borderRadius: 15,
+    },
+    paginationDots: {
+        flexDirection: 'row',
+        position: 'absolute',
+        bottom: 10,
+        alignSelf: 'center',
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginHorizontal: 4,
     },
     categoriesTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         color: '#333',
         marginVertical: 10,
-        marginLeft: 15, // Căn lề thống nhất
+        marginLeft: 15,
     },
     loadingContainer: {
         flex: 1,
@@ -211,7 +254,7 @@ const homeStyles = StyleSheet.create({
         marginBottom: 15,
     },
     retryButton: {
-        backgroundColor: '#1E90FF', // Màu xanh dương đẹp hơn
+        backgroundColor: '#1E90FF',
         paddingVertical: 12,
         paddingHorizontal: 25,
         borderRadius: 10,
@@ -226,66 +269,37 @@ const homeStyles = StyleSheet.create({
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         paddingHorizontal: 10,
-        paddingBottom: 80, // Để tránh bị thanh nav che khuất
+        paddingBottom: 80,
     },
     categoryCardWrapper: {
-        width: '48%', // Chiếm 48% để có khoảng cách giữa 2 cột
-        marginBottom: 15, // Khoảng cách giữa các hàng
+        width: '48%',
+        marginBottom: 15,
     },
     categoryCard: {
         width: '100%',
-        height: 120, // Chiều cao cố định cho mỗi thẻ
+        height: 120,
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 3, // Android shadow
-        shadowColor: '#000', // iOS shadow
+        elevation: 3,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        overflow: 'hidden', // Đảm bảo hình ảnh không tràn ra ngoài bo tròn
+        overflow: 'hidden',
     },
     categoryImage: {
-        width: '80%', // Điều chỉnh kích thước ảnh bên trong thẻ
+        width: '80%',
         height: '70%',
-        resizeMode: 'contain', // Đảm bảo ảnh vừa vặn và không bị méo
-        marginBottom: 5, // Khoảng cách giữa ảnh và tên level
-    },
-    bottomNav: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#EEE',
-        elevation: 8, // Android shadow
-        shadowColor: '#000', // iOS shadow
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        height: 70, // Tăng chiều cao một chút cho đẹp hơn
-        alignItems: 'center', // Căn giữa nội dung theo chiều dọc
-    },
-    bottomNavItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 5, // Điều chỉnh padding
-    },
-    bottomNavIcon: {
-        width: 28, // Kích thước icon lớn hơn một chút
-        height: 28,
-        marginBottom: 3,
         resizeMode: 'contain',
+        marginBottom: 5,
     },
-    bottomNavText: {
-        fontSize: 11, // Kích thước chữ nhỏ hơn cho gọn
-        color: '#555',
-        fontWeight: '600',
+    categoryName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        textAlign: 'center',
     },
 });
 
