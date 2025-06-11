@@ -12,7 +12,7 @@ const DetailTestScreen = () => {
     // Đảm bảo nhận các tham số cần thiết từ route.params
     // Đã thêm questionCount và playCount vì chúng ta cần truyền chúng sang QuestionsScreen
     // hoặc có thể bỏ qua nếu QuestionsScreen tự fetch
-    const { testId, testTitle, questionCount, playCount, imageUrl, levelName } = route.params;
+    const { testId, testTitle, description, questionCount, playCount, imageUrl, levelName } = route.params;
 
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) return '';
@@ -59,6 +59,7 @@ const DetailTestScreen = () => {
             <View style={styles.content}>
                 <Text style={styles.title}>{testTitle || 'Title'}</Text>
                 {/* Thêm các thông tin khác nếu bạn muốn hiển thị */}
+                <Text style={styles.description}>{description}</Text>
                 <Text style={styles.stats}>Số câu hỏi: {questionCount || 'Đang cập nhật'}</Text>
                 <Text style={styles.stats}>Số lần làm: {playCount || 0}</Text>
             </View>
@@ -118,6 +119,11 @@ const styles = StyleSheet.create({
         color: '#000',
         marginBottom: 10, // Tăng khoảng cách dưới tiêu đề
         textAlign: 'center', // Căn giữa tiêu đề
+    },
+    description: {
+        fontSize: 18, // Tăng kích thước chữ tiêu đề
+        color: '#000',
+        marginBottom: 10, // Tăng khoảng cách dưới tiêu đề
     },
     stats: { // Thêm style cho phần thống kê số câu hỏi/lần làm
         fontSize: 16,
