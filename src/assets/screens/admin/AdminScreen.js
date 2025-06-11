@@ -1,4 +1,4 @@
-import React from 'react';
+ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 const AdminScreen = ({ navigation }) => {
@@ -19,6 +19,20 @@ const AdminScreen = ({ navigation }) => {
       >
         <Text style={styles.buttonText}>📚 Quản lý Đơn vị (Unit)</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+  style={[styles.button, { backgroundColor: '#28a745' }]}
+  onPress={() => navigation.navigate('QuestionTypeScreen')}
+>
+  <Text style={styles.buttonText}>🧩 Quản lý Thể loại câu hỏi</Text>
+</TouchableOpacity>
+
+<TouchableOpacity
+  style={[styles.button, { backgroundColor: '#dc3545' }]}
+  onPress={() => navigation.navigate('QuestionListScreen')}
+>
+  <Text style={styles.buttonText}>❓ Quản lý Câu hỏi</Text>
+</TouchableOpacity>
+
     </View>
   );
 };

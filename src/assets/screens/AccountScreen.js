@@ -1,12 +1,33 @@
-import React, { useState } from 'react'; // Import useState
+import React, { useState, useEffect } from 'react'; // Import useEffect
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native'; // Import useIsFocused
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
+import CustomAlertDialog from '../components/CustomAlertDialog';
 
 const AccountScreen = () => {
   const navigation = useNavigation();
-  const [isLogoutAlertVisible, setLogoutAlertVisible] = useState(false); // State để quản lý hiển thị alert
+  const isFocused = useIsFocused(); // Hook để kiểm tra khi màn hình được focus
+  const [isLogoutAlertVisible, setLogoutAlertVisible] = useState(false);
+  const [userInfo, setUserInfo] = useState({ username: '', email: '' }); // State để lưu thông tin người dùng
+
+  // Hàm để tải thông tin người dùng từ AsyncStorage
+  const loadUserInfo = async () => {
+    try {
+      const storedUserInfo = await AsyncStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        setUserInfo(JSON.parse(storedUserInfo));
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải thông tin người dùng:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Tải thông tin người dùng khi màn hình được focus (hoặc khởi tạo lần đầu)
+    if (isFocused) {
+      loadUserInfo();
+    }
+  }, [isFocused]); // Chạy lại khi isFocused thay đổi
 
   const handlePressPersonalInfo = () => {
     navigation.navigate('EditProfileScreen');
@@ -17,14 +38,14 @@ const AccountScreen = () => {
   };
 
   const confirmLogout = async () => {
-    setLogoutAlertVisible(false); // Đóng alert trước khi thực hiện logout
+    setLogoutAlertVisible(false);
     try {
       await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userInfo');
+      await AsyncStorage.removeItem('userInfo'); // Xóa cả userInfo khi đăng xuất
       console.log('Đã xóa thông tin đăng nhập khỏi AsyncStorage.');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'IntroScreen' }], // Thay 'Login' bằng tên màn hình đăng nhập của bạn
+        routes: [{ name: 'IntroScreen' }],
       });
       // Có thể thêm thông báo toast hoặc snackbar thay vì Alert.alert() mặc định
       // Ví dụ: ToastAndroid.show('Bạn đã đăng xuất thành công!', ToastAndroid.SHORT);
@@ -37,12 +58,12 @@ const AccountScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tài khoản</Text>
       </View>
 
-      {/* User Info Section */}
+      
       <View style={styles.userInfoContainer}>
         <View style={styles.profileIconContainer}>
           <Image
@@ -50,11 +71,11 @@ const AccountScreen = () => {
             style={styles.profileIcon}
           />
         </View>
-        <Text style={styles.userName}>lê thanh tùng</Text>
-        <Text style={styles.userEmail}>lethanhtung0234@gmail.com</Text>
+        <Text style={styles.userName}>{userInfo.username || 'Người dùng'}</Text> {/* Hiển thị username */}
+        <Text style={styles.userEmail}>{userInfo.email || 'email@example.com'}</Text> {/* Hiển thị email */}
       </View>
 
-      {/* Options List */}
+      
       <ScrollView style={styles.optionsList}>
         <TouchableOpacity style={styles.optionItem} onPress={handlePressPersonalInfo}>
           <View style={styles.optionIconContainer}>
@@ -86,7 +107,7 @@ const AccountScreen = () => {
           <Text style={styles.optionText}>Liên hệ/Hỗ trợ</Text>
         </TouchableOpacity>
 
-        {/* Nút Đăng xuất - Mở Custom Alert */}
+        
         <TouchableOpacity style={styles.optionItem} onPress={() => setLogoutAlertVisible(true)}>
           <View style={styles.optionIconContainer}>
             <Image
@@ -98,7 +119,7 @@ const AccountScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Custom Logout Alert */}
+      
       <CustomAlertDialog
         isVisible={isLogoutAlertVisible}
         title="Đăng xuất"

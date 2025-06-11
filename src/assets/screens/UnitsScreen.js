@@ -90,24 +90,20 @@ const UnitsScreen = () => {
         }
     }, [currentLevel]); // Add currentLevel to dependencies for useCallback
 
-    // --- EFFECT 1: Fetch all levels when component mount lần đầu ---
     useEffect(() => {
         fetchAllLevels();
     }, [fetchAllLevels]); // Add fetchAllLevels to dependency array
 
-    // --- EFFECT 2: Fetch units khi currentLevel thay đổi ---
     useEffect(() => {
         if (currentLevel) {
             fetchUnitsForCurrentLevel();
         }
     }, [currentLevel, fetchUnitsForCurrentLevel]); // Add fetchUnitsForCurrentLevel to dependency array
 
-    // Xử lý khi người dùng nhấn vào một tab level
     const handleLevelPress = (level) => {
         setCurrentLevel(level);
     };
 
-    // Xử lý khi người dùng nhấn vào một Unit
     const handleUnitPress = (unitId, unitTitle) => {
         if (!currentLevel) {
             Alert.alert("Lỗi", "Không thể xác định cấp độ hiện tại để chuyển hướng.");
@@ -134,7 +130,6 @@ const UnitsScreen = () => {
         return (
             <View style={styles.centered}>
                 <Text style={styles.errorText}>{error}</Text>
-                {/* Call the now accessible fetchAllLevels */}
                 <TouchableOpacity onPress={fetchAllLevels} style={styles.retryButton}>
                     <Text style={styles.retryButtonText}>Thử lại</Text>
                 </TouchableOpacity>
@@ -150,7 +145,7 @@ const UnitsScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{currentLevel ? currentLevel.name : 'Units'}</Text>
+                    <Text style={styles.headerTitle}>List of exercises</Text>
                     <View style={{ width: 30 }} />
                 </View>
                 {/* Tabs */}
@@ -160,13 +155,20 @@ const UnitsScreen = () => {
                             <TouchableOpacity
                                 key={level.level_id.toString()}
                                 onPress={() => handleLevelPress(level)}
-                                style={styles.tab}
+                                // Apply activeTabBackground style when selected
+                                style={[
+                                    styles.tab,
+                                    currentLevel && level.level_id === currentLevel.level_id
+                                        ? styles.activeTabBackground
+                                        : null,
+                                ]}
                             >
                                 <Text
                                     style={[
                                         styles.tabText,
+                                        // Apply activeTabText style when selected
                                         currentLevel && level.level_id === currentLevel.level_id
-                                            ? styles.activeTab
+                                            ? styles.activeTabText
                                             : null,
                                     ]}
                                 >
@@ -189,7 +191,6 @@ const UnitsScreen = () => {
                 ) : error ? (
                     <View style={styles.centeredContent}>
                         <Text style={styles.errorText}>{error}</Text>
-                        {/* Call the now accessible fetchUnitsForCurrentLevel */}
                         <TouchableOpacity onPress={fetchUnitsForCurrentLevel} style={styles.retryButton}>
                             <Text style={styles.retryButtonText}>Thử lại</Text>
                         </TouchableOpacity>
@@ -232,7 +233,7 @@ const UnitsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E0E5FF',
     },
     header: {
         backgroundColor: '#FFFFFF',
@@ -280,17 +281,20 @@ const styles = StyleSheet.create({
     tab: {
         paddingHorizontal: 15,
         paddingVertical: 8,
-        borderRadius: 20,
+        borderRadius: 10,
         marginHorizontal: 5,
-        backgroundColor: '#F0F0F0',
+        backgroundColor: '#F0F0F0', // Default background
     },
     tabText: {
         fontSize: 15,
-        color: '#555',
+        color: '#555', // Default text color
         fontWeight: '600',
     },
-    activeTab: {
-        color: '#1E90FF',
+    activeTabBackground: {
+        backgroundColor: '#1E90FF', // Blue background when active
+    },
+    activeTabText: {
+        color: '#FFFFFF', // White text when active
     },
     content: {
         flex: 1,
@@ -317,19 +321,21 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     image: {
-        width: '100%',
-        height: 120,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-        marginBottom: 8,
+        width: '95%',
+        height: 100,
+        borderWidth: 1,
+        borderColor: '#D8D8D8',
+        borderRadius: 10,
+        marginTop: 4,
+        marginBottom: 6,
     },
     imageTitle: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',
         paddingHorizontal: 8,
-        paddingBottom: 10,
+        paddingBottom: 5,
     },
     centered: {
         flex: 1,

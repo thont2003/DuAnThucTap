@@ -92,20 +92,27 @@ const LoginScreen = () => {
             console.log('Server response:', response);
 
             if (response.ok) {
-                // Lấy cả 'role' và 'userId' từ phản hồi của server
-                const { message, username: usernameFromApi, role, userId } = response.data;
+                // Lấy các thông tin cần thiết từ phản hồi của server
+                const { message, username: usernameFromApi, role, userId, email: emailFromApi } = response.data; // THÊM email: emailFromApi
                 const finalUsername = usernameFromApi || email.split('@')[0];
+                const finalEmail = emailFromApi || email; // Sử dụng email trả về từ API hoặc email người dùng nhập
 
-                // --- LƯU userId VÀO ASYNCSTORAGE NGAY SAU KHI ĐĂNG NHẬP THÀNH CÔNG ---
+                // --- LƯU THÔNG TIN NGƯỜI DÙNG VÀO ASYNCSTORAGE DƯỚI DẠNG MỘT ĐỐI TƯỢNG userInfo ---
                 if (userId) {
-                    await AsyncStorage.setItem('userId', userId.toString()); // Lưu userId dưới dạng chuỗi
-                    console.log('LoginScreen: userId đã được lưu vào AsyncStorage:', userId);
+                    const userInfo = {
+                        userId: userId,
+                        username: finalUsername,
+                        email: finalEmail, // LƯU EMAIL VÀO ĐÂY
+                        role: role
+                    };
+                    await AsyncStorage.setItem('userInfo', JSON.stringify(userInfo));
+                    console.log('LoginScreen: userInfo đã được lưu vào AsyncStorage:', userInfo);
                 } else {
                     console.warn('LoginScreen: API response did not contain userId.');
                     // Tùy chọn: Xử lý trường hợp không có userId trả về
                     // showCustomAlert('Cảnh báo', 'Không nhận được ID người dùng từ server. Một số tính năng có thể không hoạt động.');
                 }
-                // ------------------------------------------------------------------
+                // ----------------------------------------------------------------------------------
 
                 // Logic phân quyền đăng nhập
                 if (role === 'admin') {
@@ -127,7 +134,7 @@ const LoginScreen = () => {
                         null,
                         'OK',
                         'Hủy',
-                        false // Không hiển thị nút hủy cho thông báo thành công này
+                        false
                     );
                 } else if (role === 'user') {
                     // Đối với user, KHÔNG HIỂN THỊ CustomAlertDialog ngay tại đây.
@@ -140,8 +147,8 @@ const LoginScreen = () => {
                                 {
                                     name: 'MainTabs',
                                     params: {
-                                        screen: 'HomeTab', // Tên màn hình của tab Home trong AppNavigator.js
-                                        params: { username: finalUsername, showLoginSuccess: true } // Thêm tham số này
+                                        screen: 'HomeTab',
+                                        params: { username: finalUsername, showLoginSuccess: true }
                                     }
                                 }
                             ],

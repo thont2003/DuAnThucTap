@@ -208,6 +208,7 @@ const QuestionsScreen = () => {
             console.log('QuestionsScreen: userId retrieved from AsyncStorage:', retrievedUserId);
 
             if (!retrievedUserId) {
+                // ... (phần xử lý lỗi user_id không tìm thấy)
                 Alert.alert(
                     'Lỗi thông tin người dùng',
                     'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
@@ -230,18 +231,21 @@ const QuestionsScreen = () => {
 
             const userIdInt = parseInt(retrievedUserId, 10);
             if (isNaN(userIdInt)) {
+                // ... (phần xử lý lỗi user_id không hợp lệ)
                 Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
                 navigation.replace('Login');
                 return;
             }
 
-            const totalScore = correctAnswersCount * 10;
             const totalQuestions = questions.length;
+            // Thay đổi tính toán điểm ở đây: từ thang điểm 100
+            // const totalScore = correctAnswersCount * 10; // Dòng cũ
+            const totalScore = Math.round((correctAnswersCount / totalQuestions) * 100); // Dòng mới
 
             const payload = {
                 userId: userIdInt,
                 testId: testId,
-                score: totalScore,
+                score: totalScore, // score này bây giờ sẽ là từ 0-100
                 totalQuestions: totalQuestions,
                 correctAnswers: correctAnswersCount,
                 userAnswers: userAnswersHistory,
@@ -254,7 +258,7 @@ const QuestionsScreen = () => {
                 console.log('QuestionsScreen: Kết quả bài làm đã được lưu thành công.');
                 Alert.alert(
                     'Hoàn thành bài kiểm tra!',
-                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${correctAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
+                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${correctAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`, // Hiển thị điểm mới
                     [
                         {
                             text: 'Xem lại kết quả',
@@ -264,7 +268,7 @@ const QuestionsScreen = () => {
                                     testTitle: testTitle,
                                     totalQuestions: totalQuestions,
                                     correctAnswers: correctAnswersCount,
-                                    totalScore: totalScore, // This is now calculated in ResultScreen
+                                    totalScore: totalScore, // Truyền điểm mới đã tính vào ResultScreen
                                     userAnswersHistory: userAnswersHistory,
                                     allQuestions: questions,
                                 });

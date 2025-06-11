@@ -16,13 +16,15 @@ const ResultScreen = () => {
         testTitle,
         totalQuestions,
         correctAnswers,
+        // THÊM totalScore VÀO ĐÂY
+        totalScore = Math.round((correctAnswers / totalQuestions) * 100), // <-- Đã nhận score từ QuestionsScreen (thang điểm 100)
         userAnswersHistory, // Lịch sử câu trả lời của người dùng
         allQuestions // Tất cả câu hỏi gốc
     } = route.params;
 
-    // TÍNH TOÁN LẠI ĐIỂM SỐ TRÊN THANG 10 NGAY TẠI ĐÂY ĐỂ ĐẢM BẢO CHÍNH XÁC
-    const calculatedScore = (correctAnswers / totalQuestions) * 10;
-    const formattedScore = calculatedScore.toFixed(2); // Đảm bảo làm tròn 2 chữ số thập phân
+    // BỎ DÒNG TÍNH TOÁN LẠI ĐIỂM SỐ TRÊN THANG 10 NGAY TẠI ĐÂY
+    // const calculatedScore = (correctAnswers / totalQuestions) * 10;
+    // const formattedScore = calculatedScore.toFixed(2);
 
     const [showIncorrectOnly, setShowIncorrectOnly] = useState(false);
     const [incorrectQuestions, setIncorrectQuestions] = useState([]);
@@ -87,7 +89,8 @@ const ResultScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <Text style={styles.testTitle}>{testTitle}</Text>
                 <Text style={styles.summaryText}>Số câu đúng: {correctAnswers}/{totalQuestions}</Text>
-                <Text style={styles.summaryText}>Điểm của bạn: {formattedScore}/10</Text>
+                {/* HIỂN THỊ ĐIỂM ĐÃ NHẬN TỪ PARAMS */}
+                <Text style={styles.summaryText}>Điểm của bạn: {totalScore}/100</Text>
 
                 <View style={styles.divider} />
 
@@ -176,7 +179,7 @@ const ResultScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E0E5FF',
     },
     header: {
         flexDirection: 'row',

@@ -145,6 +145,7 @@ const TestScreen = () => {
         navigation.navigate('DetailTest', {
             testId: test.test_id,
             testTitle: test.title,
+            description: test.description,
             questionCount: test.question_count,
             playCount: test.play_count,
             imageUrl: test.image_url,
@@ -260,7 +261,7 @@ const TestScreen = () => {
 const testStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E0E5FF',
     },
     header: {
         backgroundColor: '#FFFFFF',
@@ -309,7 +310,7 @@ const testStyles = StyleSheet.create({
     tab: {
         paddingHorizontal: 15,
         paddingVertical: 8,
-        borderRadius: 20,
+        borderRadius: 10,
         marginHorizontal: 5,
         backgroundColor: '#F0F0F0',
         minWidth: width / 4, // Ensure reasonable width for tabs

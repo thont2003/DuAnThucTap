@@ -10,8 +10,8 @@ const { width } = Dimensions.get('window');
 
 const bannerImages = [
     require('../images/home/banner.png'),
-    require('../images/home/banner.png'),
-    require('../images/home/banner.png'),
+    require('../images/home/banner1.png'),
+    require('../images/home/banner2.png'),
 ];
 
 const HomeScreen = ({ route }) => {
