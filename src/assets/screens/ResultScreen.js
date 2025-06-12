@@ -1,7 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useState, useEffect, useRef, useCallback } from 'react'; // Added useRef and useCallback
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Image,
+    LayoutAnimation,
+    Platform,
+    UIManager,
+    Alert // Added Alert for audio errors
+} from 'react-native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'; // Added useFocusEffect
 import { BASE_URL } from '../utils/constants';
+
+// Import Sound library
+import Sound from 'react-native-sound';
+
+// Ensure Sound is ready for playback (optional, but good practice)
+Sound.setCategory('Playback');
 
 // Cần cho LayoutAnimation trên Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -16,18 +33,17 @@ const ResultScreen = () => {
         testTitle,
         totalQuestions,
         correctAnswers,
-        // THÊM totalScore VÀO ĐÂY
-        totalScore = Math.round((correctAnswers / totalQuestions) * 100), // <-- Đã nhận score từ QuestionsScreen (thang điểm 100)
+        totalScore = Math.round((correctAnswers / totalQuestions) * 100), // Sử dụng giá trị mặc định nếu không có từ params
         userAnswersHistory, // Lịch sử câu trả lời của người dùng
         allQuestions // Tất cả câu hỏi gốc
     } = route.params;
 
-    // BỎ DÒNG TÍNH TOÁN LẠI ĐIỂM SỐ TRÊN THANG 10 NGAY TẠI ĐÂY
-    // const calculatedScore = (correctAnswers / totalQuestions) * 10;
-    // const formattedScore = calculatedScore.toFixed(2);
-
     const [showIncorrectOnly, setShowIncorrectOnly] = useState(false);
     const [incorrectQuestions, setIncorrectQuestions] = useState([]);
+
+    // State for audio
+    const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+    const soundRef = useRef(null); // Ref to hold the Sound object
 
     useEffect(() => {
         // Lọc ra các câu hỏi mà người dùng trả lời sai
@@ -39,15 +55,108 @@ const ResultScreen = () => {
         setIncorrectQuestions(filteredIncorrect);
     }, [allQuestions, userAnswersHistory]);
 
+    // Helper to get full image URL
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) return '';
         if (imageFileName.startsWith('http://') || imageFileName.startsWith('https://')) {
             return imageFileName;
         }
-        return `${BASE_URL}/images/${imageFileName}`;
+        return `${BASE_URL}/images/${imageFileName}`; // Assuming images are in /images directory
     };
 
-    // Modified to handle both question types
+    // Helper to get full audio URL
+    const getFullAudioUrl = (audioFileName) => {
+        if (!audioFileName) return '';
+        if (audioFileName.startsWith('http://') || audioFileName.startsWith('https://')) {
+            return audioFileName;
+        }
+        // Assuming audio files are in a /audio/ directory relative to BASE_URL
+        return `${BASE_URL}/audio/${audioFileName}`;
+    };
+
+    // Function to stop and release the current sound
+    const stopAndReleaseSound = useCallback(() => {
+        const sound = soundRef.current;
+        if (sound) {
+            sound.stop(() => {
+                if (soundRef.current === sound) {
+                    sound.release();
+                    soundRef.current = null;
+                    setIsPlayingAudio(false);
+                    console.log('Audio stopped and released');
+                }
+            });
+        }
+    }, []);
+
+
+    // Function to load and play audio
+    const playAudio = useCallback((audioPath) => {
+        // Stop any currently playing audio before starting a new one
+        stopAndReleaseSound();
+
+        if (!audioPath) {
+            console.warn('No audio path provided to play.');
+            return;
+        }
+
+        const audioUrl = getFullAudioUrl(audioPath);
+        console.log('Attempting to load audio from:', audioUrl);
+
+        soundRef.current = new Sound(audioUrl, null, (error) => {
+            if (error) {
+                console.error('Failed to load the sound:', error);
+                Alert.alert('Lỗi tải âm thanh', 'Không thể tải tệp âm thanh. Vui lòng thử lại.');
+                stopAndReleaseSound(); // Ensure resource is released even on load error
+                return;
+            }
+            console.log('Sound loaded successfully. Duration:', soundRef.current.getDuration(), 'seconds');
+
+            // Play the sound
+            soundRef.current.play((success) => {
+                if (success) {
+                    console.log('Successfully finished playing!');
+                } else {
+                    console.error('Playback failed due to audio decoding errors.');
+                    Alert.alert('Lỗi phát âm thanh', 'Không thể phát tệp âm thanh.');
+                }
+                setIsPlayingAudio(false); // Reset play state when finished
+                stopAndReleaseSound(); // Release resource after playback completes
+            });
+            setIsPlayingAudio(true); // Set playing state to true
+        });
+    }, [stopAndReleaseSound]);
+
+    const toggleAudioPlayback = (audioPath) => {
+        // If the current audio is playing AND it's the same audio file being requested, then pause it.
+        // Otherwise, stop the current and play the new one.
+        if (isPlayingAudio && soundRef.current && soundRef.current._url === getFullAudioUrl(audioPath)) {
+            stopAndReleaseSound();
+        } else {
+            playAudio(audioPath);
+        }
+    };
+
+    // Cleanup when component unmounts
+    useEffect(() => {
+        return () => {
+            stopAndReleaseSound();
+        };
+    }, [stopAndReleaseSound]);
+
+    // Use useFocusEffect to stop audio when screen loses focus (e.g., navigating back or to another tab)
+    useFocusEffect(
+        useCallback(() => {
+            // This callback is called when the screen is focused
+            // The return function is called when the screen is unfocused
+            return () => {
+                console.log('ResultScreen blurred - stopping audio.');
+                stopAndReleaseSound();
+            };
+        }, [stopAndReleaseSound])
+    );
+
+    // Modified to handle both question types for display
     const getCorrectAnswerDisplay = (question) => {
         if (question.type_id === 1) { // Multiple Choice
             const correctAnswerObj = question.answers.find(a => a.is_correct);
@@ -67,10 +176,14 @@ const ResultScreen = () => {
         return userAnswer.answerText;
     };
 
-
     const toggleShowIncorrectOnly = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setShowIncorrectOnly(prev => !prev);
+        setShowIncorrectOnly(prev => {
+            if (prev === false) { // If changing to show incorrect only
+                stopAndReleaseSound(); // Stop currently playing audio
+            }
+            return !prev;
+        });
     };
 
     const questionsToDisplay = showIncorrectOnly ? incorrectQuestions : allQuestions;
@@ -89,7 +202,6 @@ const ResultScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <Text style={styles.testTitle}>{testTitle}</Text>
                 <Text style={styles.summaryText}>Số câu đúng: {correctAnswers}/{totalQuestions}</Text>
-                {/* HIỂN THỊ ĐIỂM ĐÃ NHẬN TỪ PARAMS */}
                 <Text style={styles.summaryText}>Điểm của bạn: {totalScore}/100</Text>
 
                 <View style={styles.divider} />
@@ -114,8 +226,8 @@ const ResultScreen = () => {
                     questionsToDisplay.map((question, index) => {
                         const userAnswer = userAnswersHistory.find(ans => ans.questionId === question.question_id);
                         const isUserCorrect = userAnswer ? userAnswer.isCorrect : false;
-                        const userSelectedAnswerText = getUserAnswerDisplay(question.question_id); // Get user's answer
-                        const correctAnswerDisplay = getCorrectAnswerDisplay(question); // Get correct answer based on type
+                        const userSelectedAnswerText = getUserAnswerDisplay(question.question_id);
+                        const correctAnswerDisplay = getCorrectAnswerDisplay(question);
 
                         return (
                             <View key={question.question_id} style={styles.questionItem}>
@@ -128,6 +240,28 @@ const ResultScreen = () => {
                                         onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(question.image_path))}
                                     />
                                 )}
+                                {/* NEW: Audio Player in ResultScreen */}
+                                {question.audio_path && (
+                                    <View style={styles.audioPlayerContainer}>
+                                        <TouchableOpacity
+                                            onPress={() => toggleAudioPlayback(question.audio_path)}
+                                            style={styles.playPauseButton}
+                                        >
+                                            <Image
+                                                source={
+                                                    isPlayingAudio && soundRef.current && soundRef.current._url === getFullAudioUrl(question.audio_path)
+                                                        ? require('../images/pause.png')
+                                                        : require('../images/play.png')
+                                                }
+                                                style={styles.playPauseIcon}
+                                            />
+                                        </TouchableOpacity>
+                                        <Text style={styles.audioFileName}>
+                                            {question.audio_path.split('/').pop()}
+                                        </Text>
+                                    </View>
+                                )}
+
                                 {/* Display User's Answer */}
                                 <Text style={styles.answerStatusText(isUserCorrect)}>
                                     Bạn đã trả lời: {userSelectedAnswerText} {isUserCorrect ? '✔️' : '❌'}
@@ -291,6 +425,41 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
         marginBottom: 10,
         backgroundColor: '#EAEAEA',
+    },
+    // NEW: Styles for audio player in ResultScreen
+    audioPlayerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F0F0', // Slightly different background for audio
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+    },
+    playPauseButton: {
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: '#1E90FF',
+        marginRight: 10,
+        shadowColor: '#1E90FF',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+    playPauseIcon: {
+        width: 24,
+        height: 24,
+        tintColor: '#FFFFFF',
+    },
+    audioFileName: {
+        fontSize: 15,
+        color: '#333',
+        fontWeight: '500',
+        flexShrink: 1, // Allow text to wrap/shrink
     },
     answerStatusText: (isCorrect) => ({
         fontSize: 16,

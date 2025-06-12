@@ -1,1 +1,1 @@
-export const BASE_URL = 'http://192.168.1.8:3000'; // Thay bằng IP của bạn
+export const BASE_URL = 'http://192.168.1.18:3000'; // Thay bằng IP của bạn

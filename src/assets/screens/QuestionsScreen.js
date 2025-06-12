@@ -13,10 +13,16 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
 import { apiCall } from '../utils/api';
 import { BASE_URL } from '../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Import Sound library
+import Sound from 'react-native-sound';
+
+// Ensure Sound is ready for playback (optional, but good practice)
+Sound.setCategory('Playback');
 
 const { width } = Dimensions.get('window');
 
@@ -29,11 +35,15 @@ const QuestionsScreen = () => {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswerId, setSelectedAnswerId] = useState(null);
     const [userTextInput, setUserTextInput] = useState('');
-    const [isAnswered, setIsAnswered] = useState(false); // This state still controls showing feedback/correct answer
+    const [isAnswered, setIsAnswered] = useState(false);
     const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [userAnswersHistory, setUserAnswersHistory] = useState([]);
+
+    // State for audio
+    const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+    const soundRef = useRef(null); // Ref to hold the Sound object
 
     const scrollViewRef = useRef(null);
 
@@ -43,6 +53,82 @@ const QuestionsScreen = () => {
             return imageFileName;
         }
         return `${BASE_URL}/images/${imageFileName}`;
+    };
+
+    // Helper to get full audio URL
+    const getFullAudioUrl = (audioFileName) => {
+        if (!audioFileName) return '';
+        if (audioFileName.startsWith('http://') || audioFileName.startsWith('https://')) {
+            return audioFileName;
+        }
+        // Assuming audio files are in a similar /audio/ directory
+        return `${BASE_URL}/audio/${audioFileName}`;
+    };
+
+    // Function to stop and release the current sound
+    const stopAndReleaseSound = useCallback(() => {
+        const sound = soundRef.current;
+        if (sound) {
+            sound.stop(() => {
+                if (soundRef.current === sound) {
+                    sound.release();
+                    soundRef.current = null;
+                    setIsPlayingAudio(false);
+                    console.log('Audio stopped and released');
+                }
+            });
+        }
+    }, []);
+
+
+    // Function to load and play audio
+    const playAudio = useCallback((audioPath) => {
+        // Stop any currently playing audio
+        stopAndReleaseSound();
+
+        if (!audioPath) {
+            console.warn('No audio path provided.');
+            return;
+        }
+
+        const audioUrl = getFullAudioUrl(audioPath);
+        console.log('Attempting to load audio from:', audioUrl);
+
+        soundRef.current = new Sound(audioUrl, null, (error) => {
+            if (error) {
+                console.error('Failed to load the sound:', error);
+                Alert.alert('Lỗi tải âm thanh', 'Không thể tải tệp âm thanh. Vui lòng thử lại.');
+                stopAndReleaseSound(); // Ensure release on error
+                return;
+            }
+            console.log('Sound loaded successfully. Duration:', soundRef.current.getDuration(), 'seconds');
+
+            // Play the sound
+            soundRef.current.play((success) => {
+                if (success) {
+                    console.log('Successfully finished playing!');
+                } else {
+                    console.error('Playback failed due to audio decoding errors.');
+                    Alert.alert('Lỗi phát âm thanh', 'Không thể phát tệp âm thanh.');
+                }
+                setIsPlayingAudio(false); // Reset play state when finished
+                stopAndReleaseSound(); // Release resource after playback
+            });
+            setIsPlayingAudio(true);
+        });
+    }, [stopAndReleaseSound]);
+
+    const toggleAudioPlayback = () => {
+        if (isPlayingAudio) {
+            stopAndReleaseSound();
+        } else {
+            // Only play if there's an audio_path for the current question
+            if (currentQuestion && currentQuestion.audio_path) {
+                playAudio(currentQuestion.audio_path);
+            } else {
+                Alert.alert('Thông báo', 'Không có âm thanh cho câu hỏi này.');
+            }
+        }
     };
 
     const fetchQuestions = useCallback(async () => {
@@ -69,6 +155,7 @@ const QuestionsScreen = () => {
                 setIsAnswered(false);
                 setCorrectAnswersCount(0);
                 setUserAnswersHistory([]);
+                stopAndReleaseSound(); // Stop and release any playing audio when new questions are fetched
             } else {
                 const message = response.data?.error || response.data?.message || 'Không thể tải câu hỏi.';
                 setError(message);
@@ -82,7 +169,7 @@ const QuestionsScreen = () => {
         } finally {
             setLoading(false);
         }
-    }, [testId]);
+    }, [testId, stopAndReleaseSound]); // Add stopAndReleaseSound to dependencies
 
     useEffect(() => {
         if (testId) {
@@ -90,12 +177,41 @@ const QuestionsScreen = () => {
         }
     }, [testId, fetchQuestions]);
 
+    // Cleanup when component unmounts or navigates away
+    useEffect(() => {
+        return () => {
+            stopAndReleaseSound();
+        };
+    }, [stopAndReleaseSound]);
+
+    // Use useFocusEffect to stop audio when screen loses focus (e.g., navigating back)
+    useFocusEffect(
+        useCallback(() => {
+            // When the screen gains focus
+            // console.log('QuestionsScreen focused');
+            return () => {
+                // When the screen loses focus
+                console.log('QuestionsScreen blurred - stopping audio.');
+                stopAndReleaseSound();
+            };
+        }, [stopAndReleaseSound])
+    );
+
+    // Stop audio when changing question
+    useEffect(() => {
+        stopAndReleaseSound();
+        // You might want to automatically play the audio for the new question here
+        // if (currentQuestion && currentQuestion.audio_path) {
+        //     playAudio(currentQuestion.audio_path);
+        // }
+    }, [currentQuestionIndex, questions, stopAndReleaseSound]); // Dependencies include currentQuestionIndex and questions
+
     const handleAnswerPress = (answer) => {
-        if (isAnswered) { // Only allow selection if not already answered
+        if (isAnswered) {
             return;
         }
         setSelectedAnswerId(answer.answer_id);
-        setIsAnswered(true); // Mark as answered immediately after selection
+        setIsAnswered(true);
 
         const currentQuestion = questions[currentQuestionIndex];
         const isCorrect = answer.is_correct;
@@ -116,16 +232,14 @@ const QuestionsScreen = () => {
         ]);
     };
 
-    // This function is called when the user explicitly "submits" the text input (e.g., presses Enter)
     const handleTextInputSubmit = () => {
         if (userTextInput.trim() === '') {
             Alert.alert('Chưa nhập câu trả lời', 'Bạn phải nhập câu trả lời.');
             return;
         }
-        
-        // Only process if not already answered for this question (prevents double counting)
-        if (!isAnswered) { 
-            setIsAnswered(true); // Mark as answered
+
+        if (!isAnswered) {
+            setIsAnswered(true);
 
             const currentQuestion = questions[currentQuestionIndex];
             const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
@@ -148,14 +262,10 @@ const QuestionsScreen = () => {
         }
     };
 
-
     const handleNextQuestion = async () => {
         const currentQuestion = questions[currentQuestionIndex];
 
-        // For fill-in-the-blank, if user has typed something but not yet "submitted" (isAnswered is false)
-        // We will "submit" it automatically before moving to next.
         if (currentQuestion.type_id === 2 && userTextInput.trim() !== '' && !isAnswered) {
-             // We need to manually record the answer history for fill-in-the-blank here
             const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
             if (isCorrect) {
                 setCorrectAnswersCount(prev => prev + 1);
@@ -171,30 +281,30 @@ const QuestionsScreen = () => {
                     questionType: currentQuestion.type_id,
                 }
             ]);
-            setIsAnswered(true); // Mark as answered after recording
+            setIsAnswered(true);
         }
 
-        // Now, check if the question is "answered" based on its type
         let canProceed = false;
-        if (currentQuestion.type_id === 1) { // Multiple Choice
-            canProceed = isAnswered; // Must have selected an answer
-        } else if (currentQuestion.type_id === 2) { // Fill-in-the-blank
-            canProceed = userTextInput.trim() !== ''; // Must have *some* text
+        if (currentQuestion.type_id === 1) {
+            canProceed = isAnswered;
+        } else if (currentQuestion.type_id === 2) {
+            canProceed = userTextInput.trim() !== '';
         }
 
         if (!canProceed) {
             Alert.alert('Chưa hoàn thành', 'Vui lòng hoàn thành câu trả lời trước khi chuyển câu hỏi.');
             return;
         }
-        
-        // If it's answered, proceed
+
+        stopAndReleaseSound(); // Stop sound before moving to next question or finishing test
+
         if (currentQuestionIndex === questions.length - 1) {
             await finishTest();
         } else {
             setCurrentQuestionIndex(prev => prev + 1);
             setSelectedAnswerId(null);
-            setUserTextInput(''); // Reset text input for the next question
-            setIsAnswered(false); // Reset isAnswered for the next question
+            setUserTextInput('');
+            setIsAnswered(false);
             scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }
     };
@@ -208,7 +318,6 @@ const QuestionsScreen = () => {
             console.log('QuestionsScreen: userId retrieved from AsyncStorage:', retrievedUserId);
 
             if (!retrievedUserId) {
-                // ... (phần xử lý lỗi user_id không tìm thấy)
                 Alert.alert(
                     'Lỗi thông tin người dùng',
                     'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
@@ -231,21 +340,18 @@ const QuestionsScreen = () => {
 
             const userIdInt = parseInt(retrievedUserId, 10);
             if (isNaN(userIdInt)) {
-                // ... (phần xử lý lỗi user_id không hợp lệ)
                 Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
                 navigation.replace('Login');
                 return;
             }
 
             const totalQuestions = questions.length;
-            // Thay đổi tính toán điểm ở đây: từ thang điểm 100
-            // const totalScore = correctAnswersCount * 10; // Dòng cũ
-            const totalScore = Math.round((correctAnswersCount / totalQuestions) * 100); // Dòng mới
+            const totalScore = Math.round((correctAnswersCount / totalQuestions) * 100);
 
             const payload = {
                 userId: userIdInt,
                 testId: testId,
-                score: totalScore, // score này bây giờ sẽ là từ 0-100
+                score: totalScore,
                 totalQuestions: totalQuestions,
                 correctAnswers: correctAnswersCount,
                 userAnswers: userAnswersHistory,
@@ -258,7 +364,7 @@ const QuestionsScreen = () => {
                 console.log('QuestionsScreen: Kết quả bài làm đã được lưu thành công.');
                 Alert.alert(
                     'Hoàn thành bài kiểm tra!',
-                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${correctAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`, // Hiển thị điểm mới
+                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${correctAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
                     [
                         {
                             text: 'Xem lại kết quả',
@@ -268,7 +374,7 @@ const QuestionsScreen = () => {
                                     testTitle: testTitle,
                                     totalQuestions: totalQuestions,
                                     correctAnswers: correctAnswersCount,
-                                    totalScore: totalScore, // Truyền điểm mới đã tính vào ResultScreen
+                                    totalScore: totalScore,
                                     userAnswersHistory: userAnswersHistory,
                                     allQuestions: questions,
                                 });
@@ -354,7 +460,21 @@ const QuestionsScreen = () => {
                         onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(currentQuestion.image_path))}
                     />
                 )}
-                {/* TODO: Add audio player if audio_path exists */}
+
+                {/* Audio Player */}
+                {currentQuestion.audio_path && (
+                    <View style={questionsStyles.audioPlayerContainer}>
+                        <TouchableOpacity onPress={toggleAudioPlayback} style={questionsStyles.playPauseButton}>
+                            <Image
+                                source={isPlayingAudio ? require('../images/pause.png') : require('../images/play.png')}
+                                style={questionsStyles.playPauseIcon}
+                            />
+                        </TouchableOpacity>
+                        <Text style={questionsStyles.audioFileName}>
+                            {currentQuestion.audio_path.split('/').pop()} {/* Show only file name */}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Answers or Text Input based on type_id */}
                 <View style={questionsStyles.answersContainer}>
@@ -365,7 +485,7 @@ const QuestionsScreen = () => {
 
                             let answerButtonColor = '#F0F0F0';
                             let answerTextColor = '#333';
-                            if (isAnswered) { // Only apply feedback colors if question is answered
+                            if (isAnswered) {
                                 if (isCorrectAnswer) {
                                     answerButtonColor = '#4CAF50';
                                     answerTextColor = '#FFFFFF';
@@ -373,7 +493,7 @@ const QuestionsScreen = () => {
                                     answerButtonColor = '#F44336';
                                     answerTextColor = '#FFFFFF';
                                 }
-                            } else if (isSelected) { // Only show selected color if not answered yet
+                            } else if (isSelected) {
                                 answerButtonColor = '#BBDEFB';
                                 answerTextColor = '#1E90FF';
                             }
@@ -386,7 +506,7 @@ const QuestionsScreen = () => {
                                         { backgroundColor: answerButtonColor }
                                     ]}
                                     onPress={() => handleAnswerPress(answer)}
-                                    disabled={isAnswered} // Disable after answer is chosen
+                                    disabled={isAnswered}
                                 >
                                     <Text style={[questionsStyles.answerText, { color: answerTextColor }]}>
                                         {answer.answer_text}
@@ -401,13 +521,13 @@ const QuestionsScreen = () => {
                                 placeholder="Nhập câu trả lời của bạn..."
                                 value={userTextInput}
                                 onChangeText={setUserTextInput}
-                                editable={!isAnswered} // Disable input after answered
+                                editable={!isAnswered}
                                 autoCapitalize="none"
                                 autoCorrect={false}
-                                onSubmitEditing={handleTextInputSubmit} // Still useful for explicit submit
+                                onSubmitEditing={handleTextInputSubmit}
                                 returnKeyType="done"
                             />
-                            {isAnswered && ( // Show feedback only if isAnswered is true (meaning handleTextInputSubmit ran)
+                            {isAnswered && (
                                 <View style={questionsStyles.feedbackContainer}>
                                     <Text style={[
                                         questionsStyles.feedbackText,
@@ -427,9 +547,6 @@ const QuestionsScreen = () => {
                 <TouchableOpacity
                     style={[
                         questionsStyles.nextButton,
-                        // Disabled if:
-                        // - Multiple Choice AND not yet answered OR
-                        // - Fill-in-the-blank AND text input is empty
                         (currentQuestion.type_id === 1 && !isAnswered) ||
                         (currentQuestion.type_id === 2 && userTextInput.trim() === '')
                             ? questionsStyles.nextButtonDisabled
@@ -511,6 +628,41 @@ const questionsStyles = StyleSheet.create({
         backgroundColor: '#EAEAEA',
         borderColor: '#DDD',
         borderWidth: 1,
+    },
+    // New styles for audio player
+    audioPlayerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EAEAEA',
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    playPauseButton: {
+        padding: 10,
+        borderRadius: 25,
+        backgroundColor: '#1E90FF',
+        marginRight: 15,
+        shadowColor: '#1E90FF',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+    },
+    playPauseIcon: {
+        width: 30,
+        height: 30,
+        tintColor: '#FFFFFF',
+    },
+    audioFileName: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
     },
     answersContainer: {
         marginBottom: 20,

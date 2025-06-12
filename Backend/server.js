@@ -12,7 +12,7 @@ app.use(express.json());
 
 // ... other middleware ...
 
-const imagesDir = path.join(__dirname, 'public', 'images', 'user');
+const imagesDir = path.join(__dirname, 'public', 'images');
 if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir, { recursive: true });
 }
@@ -42,6 +42,37 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
 
+
+const audioDir = path.join(__dirname, 'public', 'audio');
+if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
+}   
+// Cấu hình Multer cho việc tải lên file âm thanh (chỉ MP3)
+const audioStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, audioDir); // Lưu vào thư mục audio
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase(); // Giữ nguyên phần mở rộng gốc
+        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, filename);
+    }
+});
+
+const uploadAudio = multer({
+    storage: audioStorage,
+    fileFilter: (req, file, cb) => {
+        const filetypes = /mp3/; // Chỉ cho phép file MP3
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Chỉ hỗ trợ file MP3.'));
+    },
+    limits: { fileSize: 10 * 1024 * 1024 } // Giới hạn 10MB cho file âm thanh
+});
+app.use('/audio', express.static(audioDir));
 app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ảnh đại diện người dùng
 
 // ... your routes ...
@@ -49,8 +80,8 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // PostgreSQL connection
 const pool = new Pool({
   user: 'postgres',
-  host: '192.168.1.8', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
-  database: 'app_english',
+  host: '192.168.1.18', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+  database: 'english',
   password: '123',
   port: 5432,
 });
