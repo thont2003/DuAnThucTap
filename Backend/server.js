@@ -12,10 +12,12 @@ app.use(express.json());
 
 // ... other middleware ...
 
-const imagesDir = path.join(__dirname, 'public', 'images', 'user');
+const imagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'profile');
 if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir, { recursive: true });
 }
+
+app.use('/images/profile', express.static(imagesDir));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -31,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     fileFilter: (req, file, cb) => {
-        const filetypes = /png/;
+        const filetypes = /png|jpg|jpeg/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = filetypes.test(file.mimetype);
         if (mimetype && extname) {
@@ -49,8 +51,8 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // PostgreSQL connection
 const pool = new Pool({
   user: 'postgres',
-  host: '192.168.1.8', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
-  database: 'app_english',
+  host: '192.168.1.7', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+  database: 'mmm',
   password: '123',
   port: 5432,
 });
@@ -202,14 +204,26 @@ app.put('/api/user/:userId', async (req, res) => {
 
 // Upload image endpoint
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
-    const { userId } = req.body;
+    const { userId, oldImagePath } = req.body;
 
     if (!userId || !req.file) {
         return res.status(400).json({ error: 'Thiếu userId hoặc file ảnh.' });
     }
 
+    // 🗑️ Xóa ảnh cũ nếu có
+    if (oldImagePath) {
+        const fullOldPath = path.join(__dirname, '..', 'src', 'assets', oldImagePath); // Ví dụ: /images/profile/xxx.jpg
+        fs.unlink(fullOldPath, (err) => {
+            if (err) {
+                console.warn('Không thể xóa ảnh cũ:', err.message);
+            } else {
+                console.log('Ảnh cũ đã được xóa:', oldImagePath);
+            }
+        });
+    }
+
     try {
-        const imagePath = `/images/user/${req.file.filename}`;
+        const imagePath = `/images/profile/${req.file.filename}`;
         const result = await pool.query(
             'UPDATE users SET profile_image_url = $1 WHERE id = $2 RETURNING *',
             [imagePath, userId]
@@ -221,7 +235,7 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
 
         res.status(200).json({
             message: 'Ảnh hồ sơ đã được cập nhật.',
-            profileImageUrl: imagePath
+            profileImageUrl: imagePath,
         });
     } catch (error) {
         console.error('Error uploading image:', error);
@@ -614,6 +628,7 @@ app.get('/api/ranking', async (req, res) => {
             SELECT
                 u.id AS user_id, -- Đổi u.user_id thành u.id
                 u.username,
+                u.profile_image_url,
                 SUM(h.score) AS total_score
             FROM
                 users u

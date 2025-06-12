@@ -26,14 +26,14 @@ const RankingScreen = () => {
     const frameImageRank2 = require('../images/silver_frame.png'); // <-- ĐƯỜNG DẪN KHUNG HẠNG 2
     const frameImageRank3 = require('../images/bronze_frame.png'); // <-- ĐƯỜNG DẪN KHUNG HẠNG 3
 
-    const getFullAvatarUrl = (avatarFileName) => {
-        if (!avatarFileName) {
+    const getFullAvatarUrl = (relativePath) => {
+        if (!relativePath) {
             return 'https://via.placeholder.com/150/CCCCCC/FFFFFF?text=No+Avatar';
         }
-        if (avatarFileName.startsWith('http://') || avatarFileName.startsWith('https://')) {
+        if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
             return avatarFileName;
         }
-        return `${BASE_URL}/avatars/${avatarFileName}`;
+        return `${BASE_URL}${relativePath}`;
     };
 
     // Refactored data fetching function
@@ -131,7 +131,7 @@ const RankingScreen = () => {
                 <View style={[styles.avatarFrameWrapper, frameStyle]}>
                     <Image source={frameSource} style={[styles.woodenFrame, frameStyle]} />
                     <Image
-                        source={{ uri: getFullAvatarUrl(user.avatar_url) }}
+                        source={{ uri: getFullAvatarUrl(user.profile_image_url) }}
                         style={[styles.avatarInsideFrame, avatarStyle]}
                         onError={() => console.log(`Error loading avatar for rank ${rank}`)}
                     />
@@ -180,7 +180,7 @@ const RankingScreen = () => {
                                     <Text style={styles.rankingItemRank}>{index + 1}</Text>
                                     <View style={styles.rankingItemUser}>
                                         <Image
-                                            source={{ uri: getFullAvatarUrl(user.avatar_url) }}
+                                            source={{ uri: getFullAvatarUrl(user.profile_image_url) }}
                                             style={styles.rankingItemAvatar}
                                             onError={() => console.log(`Error loading avatar for user ${user.username}`)}
                                         />

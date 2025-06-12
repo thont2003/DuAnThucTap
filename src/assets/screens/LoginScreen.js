@@ -9,7 +9,6 @@ import {
     ActivityIndicator,
     Image,
     Dimensions,
-    KeyboardAvoidingView,
     Platform,
     ScrollView,
     StatusBar,
@@ -18,7 +17,8 @@ import {
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
 import CustomAlertDialog from '../components/CustomAlertDialog';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // THÊM DÒNG NÀY ĐỂ LƯU userId
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from '../utils/constants';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,7 +26,6 @@ const LoginScreen = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    // const [message, setMessage] = useState(''); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog cho lỗi
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
     const navigation = useNavigation();
@@ -84,50 +83,43 @@ const LoginScreen = () => {
         }
 
         setLoading(true);
-        // setMessage(''); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog cho lỗi
 
         try {
-            console.log('Sending login request:', { email, password });
             const response = await apiCall('POST', '/login', { email, password });
-            console.log('Server response:', response);
 
             if (response.ok) {
-                // Lấy các thông tin cần thiết từ phản hồi của server
-                const { message, username: usernameFromApi, role, userId, email: emailFromApi } = response.data; // THÊM email: emailFromApi
+                const { message, username: usernameFromApi, role, userId, email: emailFromApi } = response.data;
                 const finalUsername = usernameFromApi || email.split('@')[0];
-                const finalEmail = emailFromApi || email; // Sử dụng email trả về từ API hoặc email người dùng nhập
+                const finalEmail = emailFromApi || email;
 
-                // --- LƯU THÔNG TIN NGƯỜI DÙNG VÀO ASYNCSTORAGE DƯỚI DẠNG MỘT ĐỐI TƯỢNG userInfo ---
                 if (userId) {
-                    const userInfo = {
-                        userId: userId,
-                        username: finalUsername,
-                        email: finalEmail, // LƯU EMAIL VÀO ĐÂY
-                        role: role
-                    };
-                    await AsyncStorage.setItem('userInfo', JSON.stringify(userInfo));
-                    console.log('LoginScreen: userInfo đã được lưu vào AsyncStorage:', userInfo);
-                } else {
-                    console.warn('LoginScreen: API response did not contain userId.');
-                    // Tùy chọn: Xử lý trường hợp không có userId trả về
-                    // showCustomAlert('Cảnh báo', 'Không nhận được ID người dùng từ server. Một số tính năng có thể không hoạt động.');
-                }
-                // ----------------------------------------------------------------------------------
+                    // 🟢 Gọi API để lấy đầy đủ thông tin user (bao gồm profileImageUrl)
+                    const userInfoResponse = await fetch(`${BASE_URL}/api/user/${userId}`);
+                    const userInfo = await userInfoResponse.json();
 
-                // Logic phân quyền đăng nhập
+                    const storedUser = {
+                        userId: userId,
+                        username: userInfo.username || finalUsername,
+                        email: userInfo.email || finalEmail,
+                        profileImageUrl: userInfo.profile_image_url || '',
+                        role: role,
+                    };
+
+                    await AsyncStorage.setItem('userInfo', JSON.stringify(storedUser));
+                    console.log('LoginScreen: userInfo đã được lưu:', storedUser);
+                }
+
+                // Điều hướng theo quyền
                 if (role === 'admin') {
                     showCustomAlert(
                         'Thành công',
                         message || 'Đăng nhập thành công với quyền Admin!',
                         () => {
-                            setIsAlertVisible(false); // Đóng alert
-                            // Sử dụng CommonActions.reset để xóa stack và chuyển sang AdminScreen
+                            setIsAlertVisible(false);
                             navigation.dispatch(
                                 CommonActions.reset({
                                     index: 0,
-                                    routes: [
-                                        { name: 'AdminScreen', params: { username: finalUsername } }
-                                    ],
+                                    routes: [{ name: 'AdminScreen', params: { username: finalUsername } }],
                                 })
                             );
                         },
@@ -137,9 +129,6 @@ const LoginScreen = () => {
                         false
                     );
                 } else if (role === 'user') {
-                    // Đối với user, KHÔNG HIỂN THỊ CustomAlertDialog ngay tại đây.
-                    // Thay vào đó, điều hướng trực tiếp và truyền showLoginSuccess: true
-                    // để HomeScreen (trong HomeTab) hiển thị thông báo.
                     navigation.dispatch(
                         CommonActions.reset({
                             index: 0,
@@ -148,39 +137,29 @@ const LoginScreen = () => {
                                     name: 'MainTabs',
                                     params: {
                                         screen: 'HomeTab',
-                                        params: { username: finalUsername, showLoginSuccess: true }
-                                    }
-                                }
+                                        params: { username: finalUsername, showLoginSuccess: true },
+                                    },
+                                },
                             ],
                         })
                     );
                 } else {
-                    // Trường hợp role không xác định hoặc không hợp lệ
-                    const errorMessage = 'Tài khoản của bạn không có quyền truy cập hoặc vai trò không hợp lệ.';
-                    // setMessage(errorMessage); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog
-                    showCustomAlert('Lỗi', errorMessage);
+                    showCustomAlert('Lỗi', 'Tài khoản không hợp lệ hoặc không có quyền.');
                 }
-
             } else {
-                // Xử lý lỗi từ server (ví dụ: email/mật khẩu sai)
                 const errorMessage = response.data?.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.';
-                // setMessage(errorMessage); // Không cần thiết nếu bạn chỉ dùng CustomAlertDialog
                 showCustomAlert('Lỗi', errorMessage);
             }
         } catch (error) {
             console.error('Error calling login API:', error.message);
-            // setMessage('Cannot connect to server. Please check connection and try again.'); // Không cần thiết
-            showCustomAlert('Lỗi', 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối và thử lại.');
+            showCustomAlert('Lỗi', 'Không thể kết nối tới máy chủ.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <View style={styles.container}>
             <StatusBar
                 barStyle="dark-content"
                 backgroundColor="#e0e8ff"
@@ -298,7 +277,7 @@ const LoginScreen = () => {
                     showCancelButton={showAlertCancelButton}
                 />
             </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
     );
 };
 
