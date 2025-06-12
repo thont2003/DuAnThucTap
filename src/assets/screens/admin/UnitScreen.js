@@ -11,8 +11,8 @@ import {
   FlatList
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.8:3000/units'; // Thay IP nếu cần
-const LEVEL_API_URL = 'http://192.168.1.8:3000/levels'; // API lấy danh sách levels
+const API_URL = 'http://192.168.1.18:3000/units'; // Thay IP nếu cần
+const LEVEL_API_URL = 'http://192.168.1.18:3000/levels'; // API lấy danh sách levels
 
 const UnitScreen = () => {
   const [unitName, setUnitName] = useState('');

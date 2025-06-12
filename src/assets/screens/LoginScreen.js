@@ -19,6 +19,8 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
 import CustomAlertDialog from '../components/CustomAlertDialog';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // THÊM DÒNG NÀY ĐỂ LƯU userId
+import { BASE_URL } from '../utils/constants';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -92,25 +94,25 @@ const LoginScreen = () => {
             console.log('Server response:', response);
 
             if (response.ok) {
-                // Lấy các thông tin cần thiết từ phản hồi của server
-                const { message, username: usernameFromApi, role, userId, email: emailFromApi } = response.data; // THÊM email: emailFromApi
+                const { message, username: usernameFromApi, role, userId, email: emailFromApi } = response.data;
                 const finalUsername = usernameFromApi || email.split('@')[0];
-                const finalEmail = emailFromApi || email; // Sử dụng email trả về từ API hoặc email người dùng nhập
+                const finalEmail = emailFromApi || email;
 
-                // --- LƯU THÔNG TIN NGƯỜI DÙNG VÀO ASYNCSTORAGE DƯỚI DẠNG MỘT ĐỐI TƯỢNG userInfo ---
                 if (userId) {
-                    const userInfo = {
+                    // 🟢 Gọi API để lấy đầy đủ thông tin user (bao gồm profileImageUrl)
+                    const userInfoResponse = await fetch(`${BASE_URL}/api/user/${userId}`);
+                    const userInfo = await userInfoResponse.json();
+
+                    const storedUser = {
                         userId: userId,
-                        username: finalUsername,
-                        email: finalEmail, // LƯU EMAIL VÀO ĐÂY
-                        role: role
+                        username: userInfo.username || finalUsername,
+                        email: userInfo.email || finalEmail,
+                        profileImageUrl: userInfo.profile_image_url || '',
+                        role: role,
                     };
-                    await AsyncStorage.setItem('userInfo', JSON.stringify(userInfo));
-                    console.log('LoginScreen: userInfo đã được lưu vào AsyncStorage:', userInfo);
-                } else {
-                    console.warn('LoginScreen: API response did not contain userId.');
-                    // Tùy chọn: Xử lý trường hợp không có userId trả về
-                    // showCustomAlert('Cảnh báo', 'Không nhận được ID người dùng từ server. Một số tính năng có thể không hoạt động.');
+
+                    await AsyncStorage.setItem('userInfo', JSON.stringify(storedUser));
+                    console.log('LoginScreen: userInfo đã được lưu:', storedUser);
                 }
                 // ----------------------------------------------------------------------------------
 

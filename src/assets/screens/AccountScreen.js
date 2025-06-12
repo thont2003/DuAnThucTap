@@ -3,19 +3,25 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'rea
 import { useNavigation, useIsFocused } from '@react-navigation/native'; // Import useIsFocused
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomAlertDialog from '../components/CustomAlertDialog';
+import { BASE_URL } from '../utils/constants';
 
 const AccountScreen = () => {
   const navigation = useNavigation();
   const isFocused = useIsFocused(); // Hook để kiểm tra khi màn hình được focus
   const [isLogoutAlertVisible, setLogoutAlertVisible] = useState(false);
-  const [userInfo, setUserInfo] = useState({ username: '', email: '' }); // State để lưu thông tin người dùng
+  const [userInfo, setUserInfo] = useState({ username: '', email: '', profileImageUrl: '' }); // State để lưu thông tin người dùng
 
   // Hàm để tải thông tin người dùng từ AsyncStorage
   const loadUserInfo = async () => {
     try {
       const storedUserInfo = await AsyncStorage.getItem('userInfo');
       if (storedUserInfo) {
-        setUserInfo(JSON.parse(storedUserInfo));
+        const parsed = JSON.parse(storedUserInfo);
+        setUserInfo({
+          username: parsed.username || '',
+          email: parsed.email || '',
+          profileImageUrl: parsed.profileImageUrl || '',
+        });
       }
     } catch (error) {
       console.error('Lỗi khi tải thông tin người dùng:', error);
@@ -32,6 +38,15 @@ const AccountScreen = () => {
   const handlePressPersonalInfo = () => {
     navigation.navigate('EditProfileScreen');
   };
+  
+  const handlePressSwichPassword = (optionName) => {
+  if (optionName === 'Đổi mật khẩu') {
+    navigation.navigate('ChangePasswordScreen');
+  } else {
+    console.log(`Pressed: ${optionName}`);
+  }
+};
+
 
   const handlePressOtherOption = (optionName) => {
     console.log(`Pressed: ${optionName}`);
@@ -67,12 +82,16 @@ const AccountScreen = () => {
       <View style={styles.userInfoContainer}>
         <View style={styles.profileIconContainer}>
           <Image
-            source={require('../images/profile/avatar.png')}
+            source={
+              userInfo.profileImageUrl
+                ? { uri: `${BASE_URL}${userInfo.profileImageUrl}` }
+                : require('../images/profile/avatar.png')
+            }
             style={styles.profileIcon}
           />
         </View>
-        <Text style={styles.userName}>{userInfo.username || 'Người dùng'}</Text> {/* Hiển thị username */}
-        <Text style={styles.userEmail}>{userInfo.email || 'email@example.com'}</Text> {/* Hiển thị email */}
+        <Text style={styles.userName}>{userInfo.username || 'Người dùng'}</Text>
+        <Text style={styles.userEmail}>{userInfo.email || 'email@example.com'}</Text>
       </View>
 
       
@@ -87,7 +106,7 @@ const AccountScreen = () => {
           <Text style={styles.optionText}>Thông tin tài khoản</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionItem} onPress={() => handlePressOtherOption('Đổi mật khẩu')}>
+        <TouchableOpacity style={styles.optionItem} onPress={() => handlePressSwichPassword('Đổi mật khẩu')}>
           <View style={styles.optionIconContainer}>
             <Image
               source={require('../images/profile/reset-password.png')}
@@ -165,25 +184,24 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   profileIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 50,
-    backgroundColor: '#007bff',
+    width: 130,
+    height: 130,
+    borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
   },
   profileIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 30,
-    backgroundColor: '#fff',
+    width: 160,
+    height: 160,
+    borderRadius: 100,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
+    marginTop: 10,
   },
   userEmail: {
     fontSize: 14,

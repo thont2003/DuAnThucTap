@@ -16,7 +16,7 @@ const QuestionScreen = ({ navigation }) => {
   useEffect(() => {
     const fetchQuestionTypes = async () => {
       try {
-        const res = await axios.get('http://192.168.1.8:3000/questiontypes');
+        const res = await axios.get('http://192.168.1.18:3000/questiontypes');
         setQuestionTypes(res.data);
       } catch (error) {
         console.error('Lỗi khi tải question types:', error);

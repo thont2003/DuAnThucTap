@@ -1,7 +1,6 @@
-// HomeScreen.js
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet, FlatList, StatusBar, Animated } from 'react-native'; // Import Animated
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Dimensions, StyleSheet, FlatList, StatusBar, Animated } from 'react-native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiCall } from '../utils/api';
 import { BASE_URL } from '../utils/constants';
@@ -15,12 +14,14 @@ const bannerImages = [
 ];
 
 const HomeScreen = ({ route }) => {
-    const { username, showLoginSuccess } = route.params || { username: 'Guest' }; // Nhận tham số showLoginSuccess
     const navigation = useNavigation();
+    const isFocused = useIsFocused();
 
     const [levels, setLevels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [username, setUsername] = useState('Guest'); // State để lưu username
+    const [profileImageUrl, setProfileImageUrl] = useState('');
 
     // State và Ref cho banner tự động trượt
     const [bannerIndex, setBannerIndex] = useState(0);
@@ -69,8 +70,32 @@ const HomeScreen = ({ route }) => {
         }
     };
 
+    // Hàm tải thông tin người dùng từ AsyncStorage
+    
+    const fetchUserInfo = async () => {
+        try {
+            const userInfoString = await AsyncStorage.getItem('userInfo');
+            if (userInfoString) {
+                const userInfo = JSON.parse(userInfoString);
+                setUsername(userInfo.username || 'Guest');
+
+                // 🆕 lấy đường dẫn ảnh đại diện nếu có
+                if (userInfo.profileImageUrl) {
+                    setProfileImageUrl(userInfo.profileImageUrl);
+                } else {
+                    setProfileImageUrl('');
+                }
+            }
+        } catch (error) {
+            console.error('HomeScreen: Error fetching user info:', error.message);
+            setUsername('Guest');
+            setProfileImageUrl('');
+        }
+    };
+
     useEffect(() => {
         fetchLevels();
+        fetchUserInfo(); // Tải thông tin người dùng khi component mount
 
         // Khởi tạo timeout tự động trượt banner
         const startAutoScroll = () => {
@@ -98,9 +123,16 @@ const HomeScreen = ({ route }) => {
         };
     }, []);
 
+    // Cập nhật thông tin người dùng khi focus lại
+    useEffect(() => {
+        if (isFocused) {
+            fetchUserInfo(); // Tải lại thông tin khi màn hình được focus
+        }
+    }, [isFocused]);
+
     // Effect để xử lý thông báo đăng nhập thành công
     useEffect(() => {
-        if (showLoginSuccess) {
+        if (route.params?.showLoginSuccess) {
             setShowNotification(true);
             Animated.parallel([
                 Animated.timing(notificationOpacity, {
@@ -128,27 +160,22 @@ const HomeScreen = ({ route }) => {
                         }),
                     ]).start(() => {
                         setShowNotification(false);
-                        // Đặt lại tham số route để thông báo không xuất hiện lại khi quay lại HomeScreen
                         navigation.setParams({ showLoginSuccess: undefined });
                     });
                 }, 2000); // Hiển thị trong 3 giây
             });
         }
-    }, [showLoginSuccess, notificationOpacity, notificationTranslateY, navigation]);
+    }, [route.params?.showLoginSuccess, notificationOpacity, notificationTranslateY, navigation]);
 
     const handleScroll = (event) => {
-        // Xóa timeout tự động trượt khi người dùng cuộn thủ công
         if (scrollTimeoutRef.current) {
             clearTimeout(scrollTimeoutRef.current);
         }
 
         const contentOffsetX = event.nativeEvent.contentOffset.x;
-        // Tính toán index dựa trên chiều rộng của mỗi item banner
         const newIndex = Math.round(contentOffsetX / (width * 0.95));
         setBannerIndex(newIndex);
 
-        // Đặt lại timeout tự động trượt sau khi người dùng ngừng cuộn
-        // Timeout này sẽ kích hoạt sau 4 giây không có tương tác cuộn
         scrollTimeoutRef.current = setTimeout(() => {
             setBannerIndex((prevIndex) => {
                 const nextIndex = (prevIndex + 1) % bannerImages.length;
@@ -157,8 +184,7 @@ const HomeScreen = ({ route }) => {
                 }
                 return nextIndex;
             });
-            // startAutoScroll(); // Có thể uncomment nếu muốn tiếp tục tự động trượt từ vị trí mới
-        }, 4000); // 4 giây sau khi người dùng ngừng cuộn
+        }, 4000);
     };
 
     const renderBannerItem = ({ item }) => (
@@ -167,20 +193,24 @@ const HomeScreen = ({ route }) => {
 
     return (
         <View style={homeStyles.container}>
-            {/* Cấu hình Status Bar */}
             <StatusBar
-                barStyle="dark-content" // Đặt màu chữ/icon trên Status Bar là màu tối (phù hợp với nền trắng)
-                backgroundColor="white" // Đặt màu nền của Status Bar là trắng
-                translucent={false} // Đảm bảo Status Bar không bị trong suốt và chiếm không gian
+                barStyle="dark-content"
+                backgroundColor="white"
+                translucent={false}
             />
 
-            {/* Header */}
             <View style={homeStyles.header}>
-                <Image source={require('../images/home/account.png')} style={homeStyles.avatar} />
+                <Image
+                source={
+                    profileImageUrl
+                    ? { uri: `${BASE_URL}${profileImageUrl}` }
+                    : require('../images/home/account.png')
+                }
+                style={homeStyles.avatar}
+                />
                 <Text style={homeStyles.greeting}>Hello, {username}</Text>
             </View>
 
-            {/* Thông báo đăng nhập thành công */}
             {showNotification && (
                 <Animated.View
                     style={[
@@ -195,7 +225,6 @@ const HomeScreen = ({ route }) => {
                 </Animated.View>
             )}
 
-            {/* Banner - Sử dụng FlatList */}
             <View style={homeStyles.bannerContainer}>
                 <FlatList
                     ref={flatListRef}
@@ -205,8 +234,8 @@ const HomeScreen = ({ route }) => {
                     horizontal
                     pagingEnabled
                     showsHorizontalScrollIndicator={false}
-                    onScroll={handleScroll} // Thêm onScroll để theo dõi cuộn thủ công
-                    scrollEventThrottle={16} // Tần suất gọi hàm onScroll (ms)
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
                     onScrollToIndexFailed={info => {
                         const wait = new Promise(resolve => setTimeout(resolve, 500));
                         wait.then(() => {
@@ -227,10 +256,8 @@ const HomeScreen = ({ route }) => {
                 </View>
             </View>
 
-            {/* Categories Title */}
             <Text style={homeStyles.categoriesTitle}>Categories</Text>
 
-            {/* Content Area: Loading, Error, or Categories Grid */}
             {loading ? (
                 <View style={homeStyles.loadingContainer}>
                     <ActivityIndicator size="large" color="#1E90FF" />
@@ -286,7 +313,7 @@ const homeStyles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         paddingTop: 50,
-        zIndex: 1, // Đảm bảo header nằm trên thông báo
+        zIndex: 1,
     },
     avatar: {
         width: 50,
@@ -299,18 +326,17 @@ const homeStyles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    // Styles for the success notification
     notificationContainer: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 95 : 10, // Adjust based on your header height and status bar
+        top: Platform.OS === 'ios' ? 95 : 10,
         width: '70%',
         alignSelf: 'center',
-        backgroundColor: '#82DA6C', // Green color for success
+        backgroundColor: '#82DA6C',
         padding: 12,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 10, // Ensure it's on top
+        zIndex: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
@@ -402,7 +428,6 @@ const homeStyles = StyleSheet.create({
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         paddingHorizontal: 10,
-        // paddingBottom: 80,
     },
     categoryCardWrapper: {
         width: '48%',

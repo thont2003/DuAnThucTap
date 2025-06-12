@@ -1,3 +1,4 @@
+// QuestionsScreen
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
@@ -10,10 +11,10 @@ import {
     Alert,
     Dimensions,
     TextInput,
-    KeyboardAvoidingView,
+    // KeyboardAvoidingView, // <-- Đã bỏ phần này
     Platform,
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
 import { BASE_URL } from '../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -169,7 +170,7 @@ const QuestionsScreen = () => {
         } finally {
             setLoading(false);
         }
-    }, [testId, stopAndReleaseSound]); // Add stopAndReleaseSound to dependencies
+    }, [testId, stopAndReleaseSound]);
 
     useEffect(() => {
         if (testId) {
@@ -266,6 +267,7 @@ const QuestionsScreen = () => {
         const currentQuestion = questions[currentQuestionIndex];
 
         if (currentQuestion.type_id === 2 && userTextInput.trim() !== '' && !isAnswered) {
+            // This block handles submitting answer for type 2 if not already answered on next press
             const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
             if (isCorrect) {
                 setCorrectAnswersCount(prev => prev + 1);
@@ -281,7 +283,7 @@ const QuestionsScreen = () => {
                     questionType: currentQuestion.type_id,
                 }
             ]);
-            setIsAnswered(true);
+            setIsAnswered(true); // Mark as answered after processing
         }
 
         let canProceed = false;
@@ -311,13 +313,22 @@ const QuestionsScreen = () => {
 
     const finishTest = async () => {
         setLoading(true);
-        let retrievedUserId = null;
+        let userId = null; // Khởi tạo userId là null
         try {
-            console.log('QuestionsScreen: Attempting to retrieve userId from AsyncStorage...');
-            retrievedUserId = await AsyncStorage.getItem('userId');
-            console.log('QuestionsScreen: userId retrieved from AsyncStorage:', retrievedUserId);
+            // --- BẮT ĐẦU SỬA ĐỔI ---
+            console.log('QuestionsScreen: Attempting to retrieve userInfo from AsyncStorage...');
+            const userInfoString = await AsyncStorage.getItem('userInfo');
+            
+            if (userInfoString) {
+                const userInfo = JSON.parse(userInfoString);
+                userId = userInfo.userId; // Trích xuất userId từ đối tượng userInfo
+                console.log('QuestionsScreen: userId extracted from userInfo:', userId);
+            } else {
+                console.warn('QuestionsScreen: userInfoString is NULL or undefined. User not logged in or data missing.');
+            }
+            // --- KẾT THÚC SỬA ĐỔI ---
 
-            if (!retrievedUserId) {
+            if (!userId) { // Kiểm tra userId đã được trích xuất
                 Alert.alert(
                     'Lỗi thông tin người dùng',
                     'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
@@ -338,7 +349,7 @@ const QuestionsScreen = () => {
                 return;
             }
 
-            const userIdInt = parseInt(retrievedUserId, 10);
+            const userIdInt = parseInt(userId, 10); // Parse userId sau khi đã chắc chắn nó tồn tại
             if (isNaN(userIdInt)) {
                 Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
                 navigation.replace('Login');
@@ -434,10 +445,8 @@ const QuestionsScreen = () => {
     const currentQuestion = questions[currentQuestionIndex];
 
     return (
-        <KeyboardAvoidingView
-            style={questionsStyles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        // Đã bỏ KeyboardAvoidingView
+        <View style={questionsStyles.container}> 
             {/* Header */}
             <View style={questionsStyles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backButton}>
@@ -563,7 +572,7 @@ const QuestionsScreen = () => {
                     </Text>
                 </TouchableOpacity>
             </View>
-        </KeyboardAvoidingView>
+        </View> // <-- Đã đổi lại thành View
     );
 };
 

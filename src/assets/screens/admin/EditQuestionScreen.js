@@ -10,7 +10,7 @@ const EditQuestionScreen = ({ route, navigation }) => {
 
   const handleUpdate = async () => {
     try {
-      await axios.put(`http://192.168.1.8:3000/questions/${question_id}`, {
+      await axios.put(`http://192.168.1.18:3000/questions/${question_id}`, {
         content,
         correct_answer: correctAnswer,
       });
