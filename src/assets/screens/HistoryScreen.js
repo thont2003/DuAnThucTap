@@ -1,4 +1,4 @@
-// screens/HistoryScreen.js
+//HistoryScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
@@ -45,16 +45,25 @@ const HistoryScreen = () => {
         setError(null);
         let userId = null;
         try {
-            userId = await AsyncStorage.getItem('userId');
-            console.log('HistoryScreen: Fetched userId from AsyncStorage:', userId);
+            // --- BẮT ĐẦU SỬA ĐỔI ---
+            // Lấy chuỗi JSON của 'userInfo' từ AsyncStorage
+            const userInfoString = await AsyncStorage.getItem('userInfo');
+            console.log('HistoryScreen: Fetched userInfoString from AsyncStorage:', userInfoString);
+
+            if (userInfoString) {
+                const userInfo = JSON.parse(userInfoString);
+                userId = userInfo.userId; // Trích xuất userId từ đối tượng userInfo
+                console.log('HistoryScreen: Extracted userId from userInfo:', userId);
+            }
+            // --- KẾT THÚC SỬA ĐỔI ---
 
             if (!userId) {
                 setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
-                // Optionally navigate to login screen if userId is missing
+                // Tùy chọn: điều hướng đến màn hình đăng nhập nếu userId bị thiếu
                 // navigation.replace('Login');
                 return;
             }
-            setCurrentUserId(userId); // Save userId to state
+            setCurrentUserId(userId); // Lưu userId vào state
 
             const response = await apiCall('GET', `/history/user/${userId}`);
             console.log('HistoryScreen: API response for history:', response);
@@ -165,7 +174,7 @@ const HistoryScreen = () => {
                 {history.length === 0 ? (
                     <View style={styles.noHistoryContainer}>
                         <Image
-                            source={require('../images/history-icon.png')} // Bạn cần thêm icon này
+                            source={require('../images/research.png')} // Bạn cần thêm icon này
                             style={styles.emptyHistoryIcon}
                         />
                         <Text style={styles.noHistoryText}>Chưa có lịch sử làm bài nào.</Text>

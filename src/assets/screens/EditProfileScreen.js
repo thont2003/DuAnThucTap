@@ -7,16 +7,17 @@ import {
     TextInput,
     Image,
     ScrollView,
-    KeyboardAvoidingView,
-    Platform,
     ActivityIndicator,
-    StatusBar
+    StatusBar,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiCall } from '../utils/api';
 import CustomAlertDialog from '../components/CustomAlertDialog';
-import { launchImageLibrary } from 'react-native-image-picker'; // Cập nhật import
+import { launchImageLibrary } from 'react-native-image-picker';
+import { Keyboard } from 'react-native';
+import { BASE_URL } from '../utils/constants';
 
 const EditProfileScreen = () => {
     const navigation = useNavigation();
@@ -28,7 +29,9 @@ const EditProfileScreen = () => {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [address, setAddress] = useState('');
     const [profileImageUrl, setProfileImageUrl] = useState('');
+    const [selectedImageUri, setSelectedImageUri] = useState(null); // Lưu URI ảnh tạm
     const [loading, setLoading] = useState(false);
+    const [showEmailTooltip, setShowEmailTooltip] = useState(false);
 
     const [isAlertVisible, setIsAlertVisible] = useState(false);
     const [alertTitle, setAlertTitle] = useState('');
@@ -78,6 +81,7 @@ const EditProfileScreen = () => {
                 setPhoneNumber(response.data.phone_number || '');
                 setAddress(response.data.address || '');
                 setProfileImageUrl(response.data.profile_image_url || '');
+                setSelectedImageUri(null); // Reset ảnh tạm khi tải lại
             } else {
                 showCustomAlert('Lỗi', response.data?.error || 'Không thể tải thông tin người dùng.');
             }
@@ -93,9 +97,15 @@ const EditProfileScreen = () => {
         if (isFocused) {
             fetchUserInfo();
         }
+        const showSubscription = Keyboard.addListener('keyboardDidShow', () => {});
+        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {});
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
     }, [isFocused]);
 
-    const handleImagePick = () => {
+    const handleImagePick = async () => {
         const options = {
             title: 'Chọn ảnh hồ sơ',
             storageOptions: {
@@ -108,52 +118,21 @@ const EditProfileScreen = () => {
             maxHeight: 800,
         };
 
-        launchImageLibrary(options, async (response) => {
+        launchImageLibrary(options, (response) => {
             if (response.didCancel) {
                 console.log('User cancelled image picker');
             } else if (response.error) {
                 console.error('ImagePicker Error: ', response.error);
                 showCustomAlert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
             } else {
-                setLoading(true);
-                try {
-                    const formData = new FormData();
-                    formData.append('image', {
-                        uri: response.assets[0].uri, // Truy cập uri từ assets[0]
-                        type: response.assets[0].type || 'image/jpeg',
-                        name: response.assets[0].fileName || 'profile.jpg',
-                    });
-
-                    const uploadResponse = await fetch('http://192.168.1.7:3000/api/upload', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    });
-
-                    const result = await uploadResponse.json();
-                    console.log('Upload response:', result);
-
-                    if (uploadResponse.ok && result.imageUrl) {
-                        setProfileImageUrl(result.imageUrl);
-                        showCustomAlert('Thành công', 'Ảnh hồ sơ đã được cập nhật.');
-                    } else {
-                        showCustomAlert('Lỗi', result.error || 'Không thể tải ảnh lên.');
-                    }
-                } catch (error) {
-                    console.error('Error uploading image:', error.message);
-                    showCustomAlert('Lỗi', 'Không thể tải ảnh lên.');
-                } finally {
-                    setLoading(false);
-                }
+                setSelectedImageUri(response.assets[0].uri); // Lưu URI tạm để hiển thị
             }
         });
     };
 
     const handleSave = async () => {
-        if (!username || !email || !dateOfBirth || !phoneNumber || !address) {
-            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc.');
+        if (!username.trim() || !email.trim() || !dateOfBirth.trim()) {
+            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (Tên, Email, Ngày sinh).');
             return;
         }
 
@@ -180,19 +159,64 @@ const EditProfileScreen = () => {
                 return;
             }
 
+            let newProfileImageUrl = profileImageUrl;
+            if (selectedImageUri) {
+                const formData = new FormData();
+                formData.append('image', {
+                    uri: selectedImageUri,
+                    type: 'image/jpeg',
+                    name: `profile_${Date.now()}.jpg`,
+                });
+                formData.append('userId', userId);
+
+                // 🆕 Gửi đường dẫn ảnh cũ nếu có
+                if (profileImageUrl) {
+                    formData.append('oldImagePath', profileImageUrl);
+                }
+
+                const uploadResponse = await fetch(`${BASE_URL}/api/upload-image`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const responseText = await uploadResponse.text();
+                console.log('Raw response from upload:', responseText);
+                console.log('Status code:', uploadResponse.status);
+
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (jsonError) {
+                    console.error('JSON Parse Error:', jsonError.message);
+                    showCustomAlert('Lỗi', `Phản hồi từ server không hợp lệ. Raw response: ${responseText}`);
+                    setLoading(false);
+                    return;
+                }
+
+                if (uploadResponse.ok && result.profileImageUrl) {
+                    newProfileImageUrl = result.profileImageUrl;
+                } else {
+                    showCustomAlert('Lỗi', result.error || 'Không thể tải ảnh lên.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const response = await apiCall('PUT', `/api/user/${userId}`, {
                 username,
                 email,
                 dateOfBirth,
                 phoneNumber,
                 address,
-                profileImageUrl
+                profileImageUrl: newProfileImageUrl,
             });
             console.log('EditProfileScreen: Save user response:', response);
 
             if (response.ok) {
-                const updatedUserInfo = { ...userInfo, username, email };
+                const updatedUserInfo = { ...userInfo, username, email, profileImageUrl: newProfileImageUrl };
                 await AsyncStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+                setProfileImageUrl(newProfileImageUrl); // Cập nhật ảnh sau khi lưu
+                setSelectedImageUri(null); // Reset ảnh tạm
                 showCustomAlert('Thành công', 'Thông tin đã được cập nhật thành công!', () => {
                     setIsAlertVisible(false);
                     navigation.goBack();
@@ -208,102 +232,119 @@ const EditProfileScreen = () => {
         }
     };
 
+    const handleOutsidePress = () => {
+        setShowEmailTooltip(false);
+    };
+
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <ScrollView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#f8f8f8" />
+        <TouchableWithoutFeedback onPress={handleOutsidePress}>
+            <View style={styles.container}>
                 <View style={styles.header}>
+                    <StatusBar barStyle="dark-content" backgroundColor="#f8f8f8" />
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Chỉnh sửa hồ sơ</Text>
+                    <Text style={styles.headerTitle}>Tài khoản</Text>
                 </View>
 
-                {loading ? (
-                    <ActivityIndicator size="large" style={styles.loadingIndicator} />
-                ) : (
-                    <>
-                        <View style={styles.profileImageContainer}>
-                            <TouchableOpacity
-                                onPress={handleImagePick}
-                            >
-                                <Image
-                                source={profileImageUrl ? { uri: profileImageUrl } : require('../images/home/account.png')}
-                                style={styles.profileIcon}
-                            />
-                            </TouchableOpacity>
-                        </View>
+                <ScrollView style={styles.content}>
+                    {loading ? (
+                        <ActivityIndicator size="large" style={styles.loadingIndicator} />
+                    ) : (
+                        <>
+                            <View style={styles.profileImageContainer}>
+                                <TouchableOpacity onPress={handleImagePick}>
+                                    <Image
+                                    source={
+                                        selectedImageUri
+                                        ? { uri: selectedImageUri }
+                                        : profileImageUrl
+                                            ? { uri: `${BASE_URL}${profileImageUrl}` }
+                                            : require('../images/home/account.png')
+                                    }
+                                    style={styles.profileIcon}
+                                    />
+                                </TouchableOpacity>
+                            </View>
 
-                        <View style={styles.formContainer}>
-                            <Text style={styles.inputLabel}>Tên người dùng *</Text>
-                            <TextInput
-                                style={[styles.input, styles.brightInput]}
-                                value={username}
-                                onChangeText={setUsername}
-                                placeholder="Nhập tên người dùng"
-                            />
+                            <View style={styles.formContainer}>
+                                <Text style={styles.inputLabel}>Họ và tên <Text style={styles.required}>*</Text></Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={username}
+                                    onChangeText={setUsername}
+                                />
 
-                            <Text style={styles.inputLabel}>Email *</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={email}
-                                onChangeText={setEmail}
-                                placeholder="Nhập email"
-                                keyboardType="email-address"
-                                editable={true}
-                            />
+                                <View style={styles.inputRow}>
+                                    <Text style={styles.inputLabel}>Email <Text style={styles.required}>*</Text></Text>
+                                    <TouchableOpacity onPress={() => setShowEmailTooltip(true)}>
+                                        <Image source={require('../images/question-mark.png')} style={styles.questionIcon} />
+                                    </TouchableOpacity>
+                                    {showEmailTooltip && (
+                                        <View style={styles.tooltip}>
+                                            <Text style={styles.tooltipText}>Vui lòng liên hệ với chúng tôi trong trường hợp bạn muốn đổi email</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <TextInput
+                                    style={styles.input}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    editable={false}
+                                />
 
-                            <Text style={styles.inputLabel}>Ngày sinh (DD/MM/YYYY) *</Text>
-                            <TextInput
-                                style={[styles.input, styles.brightInput]}
-                                value={dateOfBirth}
-                                onChangeText={setDateOfBirth}
-                                placeholder="DD/MM/YYYY"
-                            />
+                                <Text style={styles.inputLabel}>Ngày sinh <Text style={styles.required}>*</Text></Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={dateOfBirth}
+                                    onChangeText={setDateOfBirth}
+                                />
 
-                            <Text style={styles.inputLabel}>Số điện thoại *</Text>
-                            <TextInput
-                                style={[styles.input, styles.brightInput]}
-                                value={phoneNumber}
-                                onChangeText={setPhoneNumber}
-                                placeholder="Nhập số điện thoại"
-                                keyboardType="phone-pad"
-                            />
+                                <Text style={styles.inputLabel}>Số điện thoại</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    keyboardType="phone-pad"
+                                />
 
-                            <Text style={styles.inputLabel}>Địa chỉ *</Text>
-                            <TextInput
-                                style={[styles.input, styles.brightInput, styles.addressInput]}
-                                value={address}
-                                onChangeText={setAddress}
-                                placeholder="Nhập địa chỉ"
-                                multiline
-                                numberOfLines={4}
-                            />
+                                <Text style={styles.inputLabel}>Địa chỉ</Text>
+                                <TextInput
+                                    style={[styles.input, styles.addressInput]}
+                                    value={address}
+                                    onChangeText={setAddress}
+                                    multiline
+                                    numberOfLines={4}
+                                />
+                            </View>
+                        </>
+                    )}
+                </ScrollView>
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-                                <Text style={styles.saveButtonText}>{loading ? 'Đang lưu...' : 'Lưu Thay Đổi'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                )}
-            </ScrollView>
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
+                        <Text style={styles.saveButtonText}>{loading ? 'Đang lưu...' : 'Sửa'}</Text>
+                    </TouchableOpacity>
+                </View>
 
-            <CustomAlertDialog
-                isVisible={isAlertVisible}
-                title={alertTitle}
-                message={alertMessage}
-                onConfirm={alertOnConfirm}
-                confirmText="OK"
-                showCancelButton={false}
-            />
-        </KeyboardAvoidingView>
+                <CustomAlertDialog
+                    isVisible={isAlertVisible}
+                    title={alertTitle}
+                    message={alertMessage}
+                    onConfirm={alertOnConfirm}
+                    confirmText="OK"
+                    showCancelButton={false}
+                />
+            </View>
+        </TouchableWithoutFeedback>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f8f8',
+        backgroundColor: '#fff',
     },
     header: {
         flexDirection: 'row',
@@ -313,7 +354,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
-        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 10,
+        position: 'absolute',
+        paddingHorizontal: 15,
+        paddingTop: 50,
+        paddingBottom: 15,
+        zIndex: 1000,
+        elevation: 10,
     },
     backButton: {
         padding: 5,
@@ -332,73 +378,106 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginLeft: -30,
     },
+    content: {
+        flex: 1,
+        marginTop: 60,
+        marginBottom: 70,
+    },
     profileImageContainer: {
         alignItems: 'center',
         marginVertical: 30,
+        marginTop: 70,
     },
     profileIcon: {
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-        borderWidth: 3,
-        borderColor: '#ff5c5c',
-        resizeMode: 'cover',
-    },
-    changePhotoButton: {
-        marginTop: 15,
-        backgroundColor: '#ff5c5c',
-        paddingVertical: 8,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-    },
-    changePhotoButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
     },
     formContainer: {
         backgroundColor: '#fff',
         borderRadius: 15,
         marginHorizontal: 15,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
         marginBottom: 20,
+        padding: 10,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
     },
     inputLabel: {
         fontSize: 14,
         color: '#555',
         marginBottom: 5,
-        marginTop: 15,
         fontWeight: 'bold',
     },
+    required: {
+        color: 'red',
+    },
     input: {
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#f6f6f6',
+        height: 50,
         borderRadius: 8,
         paddingVertical: 12,
         paddingHorizontal: 15,
         fontSize: 16,
         color: '#333',
-        borderWidth: 1,
         borderColor: '#e0e0e0',
-    },
-    brightInput: {
-        backgroundColor: '#fff',
+        marginBottom: 15,
     },
     addressInput: {
         height: 100,
         lineHeight: 20,
         textAlignVertical: 'top',
     },
+    questionIcon: {
+        width: 13,
+        height: 13,
+        marginLeft: 5,
+        bottom: 3,
+        tintColor: '#696969',
+    },
+    tooltip: {
+        backgroundColor: '#000022',
+        height: 70,
+        width: 200,
+        padding: 10,
+        borderRadius: 10,
+        zIndex: 1000,
+        position: 'absolute',
+        top: -25,
+        left: 65,
+        right: 0,
+    },
+    tooltipText: {
+        color: '#fff',
+        fontSize: 14,
+    },
+    tooltipClose: {
+        marginTop: 5,
+    },
+    tooltipCloseText: {
+        color: '#fff',
+        fontSize: 12,
+        textDecorationLine: 'underline',
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        padding: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        zIndex: 1000,
+        elevation: 10,
+    },
     saveButton: {
-        backgroundColor: '#ff5c5c',
+        backgroundColor: '#007AFF',
         borderRadius: 10,
         paddingVertical: 15,
         alignItems: 'center',
-        marginTop: 30,
     },
     saveButtonText: {
         color: '#fff',

@@ -1,6 +1,7 @@
+// RankingScreen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Platform, UIManager } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Platform, UIManager, Dimensions } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../utils/constants';
 
@@ -9,6 +10,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Define ITEM_HEIGHT and LIST_MAX_HEIGHT here, outside the component function
+const ITEM_HEIGHT = 60; // Approximate height of each ranking item
+const LIST_MAX_HEIGHT = ITEM_HEIGHT * 5; // Show 4 items at a time
+
 const RankingScreen = () => {
     const navigation = useNavigation();
     const [rankingData, setRankingData] = useState([]);
@@ -16,35 +21,41 @@ const RankingScreen = () => {
     const [error, setError] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
 
-    // Dummy images for top 1, 2, 3 badges (keep these for the rank icons)
     const top1BadgeImage = require('../images/top1.png');
     const top2BadgeImage = require('../images/top2.png');
     const top3BadgeImage = require('../images/top3.png');
 
-    // **NEW: Separate images for each rank's avatar frame**
-    const frameImageRank1 = require('../images/gold_frame.png');   // <-- ĐƯỜNG DẪN KHUNG HẠNG 1
-    const frameImageRank2 = require('../images/silver_frame.png'); // <-- ĐƯỜNG DẪN KHUNG HẠNG 2
-    const frameImageRank3 = require('../images/bronze_frame.png'); // <-- ĐƯỜNG DẪN KHUNG HẠNG 3
+    const frameImageRank1 = require('../images/gold_frame.png');
+    const frameImageRank2 = require('../images/silver_frame.png');
+    const frameImageRank3 = require('../images/bronze_frame.png');
 
-    const getFullAvatarUrl = (avatarFileName) => {
-        if (!avatarFileName) {
+    const getFullAvatarUrl = (relativePath) => {
+        if (!relativePath) {
             return 'https://via.placeholder.com/150/CCCCCC/FFFFFF?text=No+Avatar';
         }
-        if (avatarFileName.startsWith('http://') || avatarFileName.startsWith('https://')) {
-            return avatarFileName;
+        if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+            return relativePath;
         }
-        return `${BASE_URL}/avatars/${avatarFileName}`;
+        return `${BASE_URL}${relativePath}`;
     };
 
-    // Refactored data fetching function
-    const fetchRankingData = async () => {
+    const fetchRankingData = useCallback(async () => {
         setLoading(true);
         setError(null);
+        let userIdFromStorage = null;
+
         try {
-            const storedUserId = await AsyncStorage.getItem('userId');
-            if (storedUserId) {
-                setCurrentUserId(parseInt(storedUserId, 10));
+            const userInfoString = await AsyncStorage.getItem('userInfo');
+            console.log('RankingScreen: Fetched userInfoString from AsyncStorage:', userInfoString);
+
+            if (userInfoString) {
+                const userInfo = JSON.parse(userInfoString);
+                userIdFromStorage = userInfo.userId;
+                console.log('RankingScreen: Extracted userId from userInfo:', userIdFromStorage);
+            } else {
+                console.warn('RankingScreen: Không tìm thấy userInfo trong AsyncStorage. Người dùng có thể chưa đăng nhập.');
             }
+            setCurrentUserId(userIdFromStorage);
 
             const response = await fetch(`${BASE_URL}/api/ranking`);
             if (!response.ok) {
@@ -56,21 +67,17 @@ const RankingScreen = () => {
             setRankingData(sortedData);
         } catch (err) {
             console.error("Failed to fetch ranking data or user ID:", err);
-            setError("Không thể tải bảng xếp hạng. Vui lòng thử lại sau sau.");
+            setError("Không thể tải bảng xếp hạng. Vui lòng thử lại sau.");
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    // Use useFocusEffect to re-fetch data whenever the screen comes into focus
     useFocusEffect(
         useCallback(() => {
             fetchRankingData();
-            // Optional: You can return a cleanup function here if needed
-            return () => {
-                // For example, if you have listeners that need to be removed
-            };
-        }, []) // Empty dependency array means this effect runs once when mounted and every time it focuses
+            return () => {};
+        }, [fetchRankingData])
     );
 
     if (loading) {
@@ -93,7 +100,6 @@ const RankingScreen = () => {
         );
     }
 
-    // Helper function to render a top user card
     const renderTopUserCard = (user, rank) => {
         if (!user) return null;
 
@@ -112,26 +118,27 @@ const RankingScreen = () => {
                 frameSource = frameImageRank2;
                 frameStyle = styles.frame_rank2;
                 avatarStyle = styles.avatar_rank2;
+                cardStyle = styles.rank2_3Card;
                 badgeImage = top2BadgeImage;
                 break;
             case 3:
                 frameSource = frameImageRank3;
                 frameStyle = styles.frame_rank3;
                 avatarStyle = styles.avatar_rank3;
+                cardStyle = styles.rank2_3Card;
                 badgeImage = top3BadgeImage;
                 break;
             default:
-                // Fallback for ranks beyond top 3 if needed, or error
                 return null;
         }
 
         return (
-            <View style={[styles.topUserCard, cardStyle]}>
+            <View key={user.user_id} style={[styles.topUserCard, cardStyle]}>
                 <Image source={badgeImage} style={styles.topBadge} />
                 <View style={[styles.avatarFrameWrapper, frameStyle]}>
                     <Image source={frameSource} style={[styles.woodenFrame, frameStyle]} />
                     <Image
-                        source={{ uri: getFullAvatarUrl(user.avatar_url) }}
+                        source={{ uri: getFullAvatarUrl(user.profile_image_url) }}
                         style={[styles.avatarInsideFrame, avatarStyle]}
                         onError={() => console.log(`Error loading avatar for rank ${rank}`)}
                     />
@@ -142,6 +149,7 @@ const RankingScreen = () => {
         );
     };
 
+    const remainingRankingData = rankingData.slice(3);
 
     return (
         <View style={styles.container}>
@@ -157,38 +165,44 @@ const RankingScreen = () => {
                 {rankingData.length > 0 ? (
                     <>
                         <View style={styles.top3Container}>
-                            {renderTopUserCard(rankingData[1], 2)}
-                            {renderTopUserCard(rankingData[0], 1)}
-                            {renderTopUserCard(rankingData[2], 3)}
+                            {rankingData[1] && renderTopUserCard(rankingData[1], 2)}
+                            {rankingData[0] && renderTopUserCard(rankingData[0], 1)}
+                            {rankingData[2] && renderTopUserCard(rankingData[2], 3)}
                         </View>
 
-                        <View style={styles.rankingListContainer}>
+                        <View style={[styles.rankingListContainer, { maxHeight: LIST_MAX_HEIGHT }]}>
                             <View style={styles.rankingHeaderRow}>
                                 <Text style={styles.rankingHeaderRank}>Hạng</Text>
                                 <Text style={styles.rankingHeaderName}>Người dùng</Text>
                                 <Text style={styles.rankingHeaderScore}>Điểm</Text>
                             </View>
-                            {rankingData.map((user, index) => (
-                                <View
-                                    key={user.user_id}
-                                    style={[
-                                        styles.rankingItem,
-                                        index % 2 === 0 ? styles.rankingItemEven : styles.rankingItemOdd,
-                                        user.user_id === currentUserId && styles.currentUserHighlight
-                                    ]}
-                                >
-                                    <Text style={styles.rankingItemRank}>{index + 1}</Text>
-                                    <View style={styles.rankingItemUser}>
-                                        <Image
-                                            source={{ uri: getFullAvatarUrl(user.avatar_url) }}
-                                            style={styles.rankingItemAvatar}
-                                            onError={() => console.log(`Error loading avatar for user ${user.username}`)}
-                                        />
-                                        <Text style={styles.rankingItemUsername} numberOfLines={1}>{user.username}</Text>
-                                    </View>
-                                    <Text style={styles.rankingItemScore}>{user.total_score}</Text>
-                                </View>
-                            ))}
+                            <ScrollView nestedScrollEnabled={true}>
+                                {remainingRankingData.length > 0 ? (
+                                    remainingRankingData.map((user, index) => (
+                                        <View
+                                            key={user.user_id}
+                                            style={[
+                                                styles.rankingItem,
+                                                (index + 3) % 2 === 0 ? styles.rankingItemEven : styles.rankingItemOdd,
+                                                user.user_id === currentUserId && styles.currentUserHighlight
+                                            ]}
+                                        >
+                                            <Text style={styles.rankingItemRank}>{index + 4}</Text>
+                                            <View style={styles.rankingItemUser}>
+                                                <Image
+                                                    source={{ uri: getFullAvatarUrl(user.profile_image_url) }}
+                                                    style={styles.rankingItemAvatar}
+                                                    onError={() => console.log(`Error loading avatar for user ${user.username}`)}
+                                                />
+                                                <Text style={styles.rankingItemUsername} numberOfLines={1}>{user.username}</Text>
+                                            </View>
+                                            <Text style={styles.rankingItemScore}>{user.total_score}</Text>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <Text style={styles.noMoreDataText}>Không còn người dùng nào trong bảng xếp hạng.</Text>
+                                )}
+                            </ScrollView>
                         </View>
                     </>
                 ) : (
@@ -268,7 +282,7 @@ const styles = StyleSheet.create({
     },
     top3Container: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         alignItems: 'flex-end',
         marginBottom: 30,
         backgroundColor: '#FFFFFF',
@@ -283,73 +297,63 @@ const styles = StyleSheet.create({
     },
     topUserCard: {
         alignItems: 'center',
-        width: '30%',
+        width: '32%',
         paddingVertical: 10,
         borderRadius: 10,
     },
     rank1Card: {
-        transform: [{ translateY: -20 }],
+        transform: [{ translateY: -30 }],
         zIndex: 2,
+    },
+    rank2_3Card: {
+        // No specific transform needed here, aligned by parent's flex-end
     },
     topBadge: {
         width: 100,
         height: 100,
         resizeMode: 'contain',
-
     },
-    // Common wrapper for avatar and frame
     avatarFrameWrapper: {
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-        position: 'relative', // Allows absolute positioning of children
+        position: 'relative',
     },
-    // Common style for the wooden frame image itself
     woodenFrame: {
-        resizeMode: 'contain', // Adjust as needed
+        resizeMode: 'contain',
         position: 'absolute',
-        zIndex: 1, // Frame is above avatar
+        zIndex: 1,
     },
-    // Common style for the avatar image inside the frame
     avatarInsideFrame: {
-        borderRadius: 999, // Large enough to ensure a perfect circle
-        backgroundColor: '#E0E0E0', // Placeholder background
+        borderRadius: 999,
+        backgroundColor: '#E0E0E0',
         position: 'absolute',
-        zIndex: 0, // Avatar is below frame
+        zIndex: 0,
     },
-
-    // **SPECIFIC STYLES FOR EACH RANK'S FRAME AND AVATAR**
-    // Rank 1
     frame_rank1: {
-        width: 130, // Larger frame
+        width: 130,
         height: 130,
     },
     avatar_rank1: {
-        width: 90, // Larger avatar to fit inside
+        width: 90,
         height: 90,
     },
-
-    // Rank 2
     frame_rank2: {
-        width: 110, // Medium frame
+        width: 110,
         height: 110,
     },
     avatar_rank2: {
-        width: 75, // Medium avatar
+        width: 75,
         height: 75,
     },
-
-    // Rank 3
     frame_rank3: {
-        width: 95, // Smaller frame
+        width: 95,
         height: 95,
     },
     avatar_rank3: {
-        width: 65, // Smaller avatar
+        width: 65,
         height: 65,
     },
-    // END SPECIFIC STYLES
-
     topUsername: {
         fontSize: 16,
         fontWeight: 'bold',
@@ -380,6 +384,7 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
+        // maxHeight: LIST_MAX_HEIGHT, // This is applied inline in the JSX
     },
     rankingHeaderRow: {
         flexDirection: 'row',
@@ -417,6 +422,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 5,
         paddingHorizontal: 5,
+        height: ITEM_HEIGHT,
     },
     rankingItemEven: {
         backgroundColor: '#F0F8FF',
@@ -466,6 +472,12 @@ const styles = StyleSheet.create({
         color: '#777',
         textAlign: 'center',
         marginTop: 50,
+    },
+    noMoreDataText: {
+        fontSize: 15,
+        color: '#777',
+        textAlign: 'center',
+        marginTop: 20,
     },
 });
 

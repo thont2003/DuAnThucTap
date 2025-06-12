@@ -10,7 +10,7 @@ const QuestionListScreen = ({ route }) => {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const res = await axios.get(`http://192.168.1.8:3000/questions/${Number(type_id)}`);
+        const res = await axios.get(`http://192.168.1.18:3000/questions/${Number(type_id)}`);
         setQuestions(res.data);
       } catch (error) {
         console.error('Lỗi khi tải câu hỏi:', error);

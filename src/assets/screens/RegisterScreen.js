@@ -1,3 +1,4 @@
+// RegisterScreen.js
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -5,7 +6,6 @@ import {
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    // Alert, // Không cần Alert mặc định nữa
     ActivityIndicator,
     Image,
     Dimensions,
@@ -13,11 +13,11 @@ import {
     Platform,
     ScrollView,
     StatusBar,
-    BackHandler, // Import BackHandler
+    BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
-import CustomAlertDialog from '../components/CustomAlertDialog'; // Import CustomAlertDialog
+import CustomAlertDialog from '../components/CustomAlertDialog';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,7 +27,6 @@ const RegisterScreen = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    // const [message, setMessage] = useState(''); // Comment hoặc xóa vì dùng CustomAlertDialog
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const navigation = useNavigation();
@@ -40,7 +39,7 @@ const RegisterScreen = () => {
     const [alertOnCancel, setAlertOnCancel] = useState(() => () => {});
     const [alertConfirmText, setAlertConfirmText] = useState('OK');
     const [alertCancelText, setAlertCancelText] = useState('Hủy');
-    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true); // State mới cho nút hủy
+    const [showAlertCancelButton, setShowAlertCancelButton] = useState(true);
 
     // Hàm hiển thị Custom Alert
     const showCustomAlert = (
@@ -50,7 +49,7 @@ const RegisterScreen = () => {
         cancelAction = null,
         confirmBtnText = 'OK',
         cancelBtnText = 'Hủy',
-        shouldShowCancelButton = true // Mặc định là true
+        shouldShowCancelButton = true
     ) => {
         setAlertTitle(title);
         setAlertMessage(message);
@@ -65,10 +64,8 @@ const RegisterScreen = () => {
     // --- Cập nhật phần xử lý nút back cứng trên Android ---
     useEffect(() => {
         const backAction = () => {
-            // Khi nhấn nút back cứng, chúng ta sẽ pop về màn hình đầu tiên (IntroScreen)
-            // để đảm bảo hiệu ứng pop nhất quán và tránh vòng lặp.
             navigation.popToTop();
-            return true; // Ngăn hành vi mặc định của nút back
+            return true;
         };
 
         const backHandler = BackHandler.addEventListener(
@@ -76,23 +73,44 @@ const RegisterScreen = () => {
             backAction
         );
 
-        return () => backHandler.remove(); // Hủy đăng ký listener khi component unmount
+        return () => backHandler.remove();
     }, [navigation]);
     // --- Kết thúc cập nhật phần xử lý nút back cứng ---
 
     const handleRegister = async () => {
         if (!username || !email || !password || !confirmPassword) {
-            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+            showCustomAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin.');
             return;
         }
 
         if (password !== confirmPassword) {
-            showCustomAlert('Lỗi', 'Mật khẩu xác nhận không khớp');
+            showCustomAlert('Lỗi', 'Mật khẩu xác nhận không khớp.');
+            return;
+        }
+
+        // Client-side password validation
+        if (password.length < 8 || password.length > 50) {
+            showCustomAlert('Lỗi', 'Mật khẩu phải có độ dài từ 8 đến 50 ký tự.');
+            return;
+        }
+        if (!/[a-z]/.test(password)) {
+            showCustomAlert('Lỗi', 'Mật khẩu phải chứa ít nhất một chữ cái thường.');
+            return;
+        }
+        if (!/[A-Z]/.test(password)) {
+            showCustomAlert('Lỗi', 'Mật khẩu phải chứa ít nhất một chữ cái hoa.');
+            return;
+        }
+        if (!/[0-9]/.test(password)) {
+            showCustomAlert('Lỗi', 'Mật khẩu phải chứa ít nhất một chữ số.');
+            return;
+        }
+        if (password.includes(username) || password.includes(email.split('@')[0])) {
+            showCustomAlert('Lỗi', 'Mật khẩu không được trùng với tên người dùng hoặc một phần email của bạn.');
             return;
         }
 
         setLoading(true);
-        // setMessage(''); // Không cần reset message nữa
 
         try {
             console.log('Sending registration request:', { username, email, password });
@@ -104,24 +122,20 @@ const RegisterScreen = () => {
                     'Thành công',
                     response.data.message || 'Đăng ký thành công!',
                     () => {
-                        setIsAlertVisible(false); // Đóng alert
-                        // Khi đăng ký thành công, thay thế RegisterScreen bằng LoginScreen
-                        // để người dùng không thể back lại RegisterScreen một cách không mong muốn
-                        navigation.replace('Login'); // Sử dụng replace thay vì navigate
+                        setIsAlertVisible(false);
+                        navigation.replace('Login');
                     },
-                    null, // Không có hàm cancel đặc biệt cho trường hợp này
+                    null,
                     'OK',
-                    'Hủy', // Văn bản này không dùng vì nút hủy không hiển thị
-                    false // Rất quan trọng: Không hiển thị nút Hủy
+                    'Hủy',
+                    false
                 );
             } else {
                 const errorMessage = response.data?.error || 'Đăng ký thất bại';
-                // setMessage(errorMessage); // Không cần set message nữa
-                showCustomAlert('Lỗi', errorMessage); // Mặc định vẫn có nút hủy nếu là lỗi
+                showCustomAlert('Lỗi', errorMessage);
             }
         } catch (error) {
             console.error('Error calling register API:', error.message);
-            // setMessage('Cannot connect to server. Please check connection and try again.'); // Không cần set message nữa
             showCustomAlert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối.');
         } finally {
             setLoading(false);
@@ -141,7 +155,6 @@ const RegisterScreen = () => {
                 contentContainerStyle={styles.scrollViewContent}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Cập nhật onPress của nút back trên UI để dùng popToTop() */}
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.popToTop()}>
                     <Image
                         source={require('../images/login_signup/back.png')}
@@ -235,6 +248,10 @@ const RegisterScreen = () => {
                         </TouchableOpacity>
                     </View>
 
+                    <Text style={styles.rule}>✓ Mật khẩu trong khoảng 8-50 ký tự</Text>
+                    <Text style={styles.rule}>✓ Mật khẩu không được trùng số điện thoại/username</Text>
+                    <Text style={styles.rule}>✓ Phải có chữ thường, chữ hoa, và số</Text>
+
                     <TouchableOpacity
                         style={styles.loginButton}
                         onPress={handleRegister}
@@ -247,14 +264,10 @@ const RegisterScreen = () => {
                         )}
                     </TouchableOpacity>
 
-                    {/* Dòng hiển thị message đã được xóa hoặc comment */}
-                    {/* {message ? <Text style={styles.message}>{message}</Text> : null} */}
-
                     <View style={styles.signUpContainer}>
                         <Text style={styles.dontHaveAccountText}>
                             Already have an account?{' '}
                         </Text>
-                        {/* Cập nhật onPress của nút Login để dùng replace */}
                         <TouchableOpacity onPress={() => navigation.replace('Login')}>
                             <Text style={styles.signupText}>Login</Text>
                         </TouchableOpacity>
@@ -262,7 +275,6 @@ const RegisterScreen = () => {
                 </View>
             </ScrollView>
 
-            {/* Custom Alert Dialog */}
             <CustomAlertDialog
                 isVisible={isAlertVisible}
                 title={alertTitle}
@@ -441,11 +453,12 @@ const styles = StyleSheet.create({
         color: '#ff5c5c',
         fontWeight: 'bold',
     },
-    message: { // Có thể xóa hoàn toàn style này nếu không còn sử dụng `message` state
-        marginTop: 20,
-        fontSize: 16,
-        color: 'red',
-        textAlign: 'center',
+    rule: {
+        alignSelf: 'flex-start',
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 5,
+        fontWeight: '400',
     },
 });
 

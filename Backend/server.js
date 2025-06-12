@@ -12,10 +12,12 @@ app.use(express.json());
 
 // ... other middleware ...
 
-const imagesDir = path.join(__dirname, 'public', 'images');
+const imagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'profile');
 if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir, { recursive: true });
 }
+
+app.use('/images/profile', express.static(imagesDir));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -31,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     fileFilter: (req, file, cb) => {
-        const filetypes = /png/;
+        const filetypes = /png|jpg|jpeg/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = filetypes.test(file.mimetype);
         if (mimetype && extname) {
@@ -42,37 +44,8 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
 
-
-const audioDir = path.join(__dirname, 'public', 'audio');
-if (!fs.existsSync(audioDir)) {
-    fs.mkdirSync(audioDir, { recursive: true });
-}   
-// Cấu hình Multer cho việc tải lên file âm thanh (chỉ MP3)
-const audioStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, audioDir); // Lưu vào thư mục audio
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase(); // Giữ nguyên phần mở rộng gốc
-        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-        cb(null, filename);
-    }
-});
-
-const uploadAudio = multer({
-    storage: audioStorage,
-    fileFilter: (req, file, cb) => {
-        const filetypes = /mp3/; // Chỉ cho phép file MP3
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = filetypes.test(file.mimetype);
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error('Chỉ hỗ trợ file MP3.'));
-    },
-    limits: { fileSize: 10 * 1024 * 1024 } // Giới hạn 10MB cho file âm thanh
-});
-app.use('/audio', express.static(audioDir));
+app.use('/audio', express.static('public/audio'));
+app.use('/images', express.static('public/images'));
 app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ảnh đại diện người dùng
 
 // ... your routes ...
@@ -93,6 +66,7 @@ app.get('/', (req, res) => {
 
 // Register route
 // Register endpoint
+// Backend: app.post('/register', ...)
 app.post('/register', async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -111,10 +85,29 @@ app.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Tên người dùng đã được sử dụng.' });
         }
 
+        // Server-side password validation
+        if (password.length < 8 || password.length > 50) {
+            return res.status(400).json({ error: 'Mật khẩu phải có độ dài từ 8 đến 50 ký tự.' });
+        }
+        if (!/[a-z]/.test(password)) {
+            return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất một chữ cái thường.' });
+        }
+        if (!/[A-Z]/.test(password)) {
+            return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất một chữ cái hoa.' });
+        }
+        if (!/[0-9]/.test(password)) {
+            return res.status(400).json({ error: 'Mật khẩu phải chứa ít nhất một chữ số.' });
+        }
+        if (password.includes(username) || password.includes(email.split('@')[0])) {
+            return res.status(400).json({ error: 'Mật khẩu không được trùng với tên người dùng hoặc một phần email của bạn.' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
+        const defaultProfileImage = '/images/profile/avatar.png'; // Default profile image path
+        
         const result = await pool.query(
-            'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, role',
-            [username, email, hashedPassword]
+            'INSERT INTO users (username, email, password, profile_image_url) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role, profile_image_url',
+            [username, email, hashedPassword, defaultProfileImage]
         );
 
         const user = result.rows[0];
@@ -123,7 +116,8 @@ app.post('/register', async (req, res) => {
             userId: user.id,
             username: user.username,
             email: user.email,
-            role: user.role
+            role: user.role,
+            profile_image_url: user.profile_image_url
         });
     } catch (error) {
         console.error('Error during registration:', error);
@@ -233,14 +227,26 @@ app.put('/api/user/:userId', async (req, res) => {
 
 // Upload image endpoint
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
-    const { userId } = req.body;
+    const { userId, oldImagePath } = req.body;
 
     if (!userId || !req.file) {
         return res.status(400).json({ error: 'Thiếu userId hoặc file ảnh.' });
     }
 
+    // 🗑️ Xóa ảnh cũ nếu có
+    if (oldImagePath) {
+        const fullOldPath = path.join(__dirname, '..', 'src', 'assets', oldImagePath); // Ví dụ: /images/profile/xxx.jpg
+        fs.unlink(fullOldPath, (err) => {
+            if (err) {
+                console.warn('Không thể xóa ảnh cũ:', err.message);
+            } else {
+                console.log('Ảnh cũ đã được xóa:', oldImagePath);
+            }
+        });
+    }
+
     try {
-        const imagePath = `/images/user/${req.file.filename}`;
+        const imagePath = `/images/profile/${req.file.filename}`;
         const result = await pool.query(
             'UPDATE users SET profile_image_url = $1 WHERE id = $2 RETURNING *',
             [imagePath, userId]
@@ -252,7 +258,7 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
 
         res.status(200).json({
             message: 'Ảnh hồ sơ đã được cập nhật.',
-            profileImageUrl: imagePath
+            profileImageUrl: imagePath,
         });
     } catch (error) {
         console.error('Error uploading image:', error);
@@ -645,6 +651,7 @@ app.get('/api/ranking', async (req, res) => {
             SELECT
                 u.id AS user_id, -- Đổi u.user_id thành u.id
                 u.username,
+                u.profile_image_url,
                 SUM(h.score) AS total_score
             FROM
                 users u
@@ -663,6 +670,38 @@ app.get('/api/ranking', async (req, res) => {
         res.status(500).json({ message: 'Lỗi server khi lấy bảng xếp hạng.' });
     }
 });
+
+// Change password endpoint
+app.put('/api/user/:userId/change-password', async (req, res) => {
+  const { userId } = req.params;
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'Thiếu thông tin mật khẩu.' });
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Người dùng không tồn tại.' });
+    }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Mật khẩu cũ không đúng.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+
+    return res.status(200).json({ message: 'Đổi mật khẩu thành công.' });
+  } catch (err) {
+    console.error('Error changing password:', err);
+    return res.status(500).json({ error: 'Lỗi server khi đổi mật khẩu.' });
+  }
+});
+
 
 app.listen(3000, () => {
   console.log('✅ Server is running at http://localhost:3000');

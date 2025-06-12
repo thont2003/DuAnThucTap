@@ -10,7 +10,7 @@ import {
     Image
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.8:3000/levels';
+const API_URL = 'http://192.168.1.18:3000/levels';
 
 const LevelSceen = () => {
     const [levelName, setLevelName] = useState('');
