@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'; // Added useRef and useCallback
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -9,9 +9,9 @@ import {
     LayoutAnimation,
     Platform,
     UIManager,
-    Alert // Added Alert for audio errors
+    Alert
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'; // Added useFocusEffect
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { BASE_URL } from '../utils/constants';
 
 // Import Sound library
@@ -79,7 +79,7 @@ const ResultScreen = () => {
         const sound = soundRef.current;
         if (sound) {
             sound.stop(() => {
-                if (soundRef.current === sound) {
+                if (soundRef.current === sound) { // Ensure we are releasing the sound we intended to stop
                     sound.release();
                     soundRef.current = null;
                     setIsPlayingAudio(false);
@@ -88,7 +88,6 @@ const ResultScreen = () => {
             });
         }
     }, []);
-
 
     // Function to load and play audio
     const playAudio = useCallback((audioPath) => {
@@ -209,13 +208,13 @@ const ResultScreen = () => {
                 <View style={styles.toggleButtonContainer}>
                     <TouchableOpacity
                         style={[styles.toggleButton, !showIncorrectOnly && styles.toggleButtonActive]}
-                        onPress={() => setShowIncorrectOnly(false)}
+                        onPress={() => toggleShowIncorrectOnly(false)} // Pass false to explicitly show all
                     >
                         <Text style={[styles.toggleButtonText, !showIncorrectOnly && styles.toggleButtonTextActive]}>Tất cả câu hỏi</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.toggleButton, showIncorrectOnly && styles.toggleButtonActive]}
-                        onPress={() => setShowIncorrectOnly(true)}
+                        onPress={() => toggleShowIncorrectOnly(true)} // Pass true to explicitly show incorrect
                     >
                         <Text style={[styles.toggleButtonText, showIncorrectOnly && styles.toggleButtonTextActive]}>Xem câu sai ({incorrectQuestions.length})</Text>
                     </TouchableOpacity>

@@ -1,4 +1,3 @@
-// QuestionsScreen
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
@@ -8,11 +7,11 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     ScrollView,
-    Alert,
+    Alert, // Import Alert for the confirmation dialog
     Dimensions,
     TextInput,
-    // KeyboardAvoidingView, // <-- Đã bỏ phần này
     Platform,
+    StatusBar,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { apiCall } from '../utils/api';
@@ -22,7 +21,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Import Sound library
 import Sound from 'react-native-sound';
 
-// Ensure Sound is ready for playback (optional, but good practice)
 Sound.setCategory('Playback');
 
 const { width } = Dimensions.get('window');
@@ -44,7 +42,7 @@ const QuestionsScreen = () => {
 
     // State for audio
     const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-    const soundRef = useRef(null); // Ref to hold the Sound object
+    const soundRef = useRef(null);
 
     const scrollViewRef = useRef(null);
 
@@ -56,17 +54,14 @@ const QuestionsScreen = () => {
         return `${BASE_URL}/images/${imageFileName}`;
     };
 
-    // Helper to get full audio URL
     const getFullAudioUrl = (audioFileName) => {
         if (!audioFileName) return '';
         if (audioFileName.startsWith('http://') || audioFileName.startsWith('https://')) {
             return audioFileName;
         }
-        // Assuming audio files are in a similar /audio/ directory
         return `${BASE_URL}/audio/${audioFileName}`;
     };
 
-    // Function to stop and release the current sound
     const stopAndReleaseSound = useCallback(() => {
         const sound = soundRef.current;
         if (sound) {
@@ -81,10 +76,7 @@ const QuestionsScreen = () => {
         }
     }, []);
 
-
-    // Function to load and play audio
     const playAudio = useCallback((audioPath) => {
-        // Stop any currently playing audio
         stopAndReleaseSound();
 
         if (!audioPath) {
@@ -99,12 +91,11 @@ const QuestionsScreen = () => {
             if (error) {
                 console.error('Failed to load the sound:', error);
                 Alert.alert('Lỗi tải âm thanh', 'Không thể tải tệp âm thanh. Vui lòng thử lại.');
-                stopAndReleaseSound(); // Ensure release on error
+                stopAndReleaseSound();
                 return;
             }
             console.log('Sound loaded successfully. Duration:', soundRef.current.getDuration(), 'seconds');
 
-            // Play the sound
             soundRef.current.play((success) => {
                 if (success) {
                     console.log('Successfully finished playing!');
@@ -112,8 +103,8 @@ const QuestionsScreen = () => {
                     console.error('Playback failed due to audio decoding errors.');
                     Alert.alert('Lỗi phát âm thanh', 'Không thể phát tệp âm thanh.');
                 }
-                setIsPlayingAudio(false); // Reset play state when finished
-                stopAndReleaseSound(); // Release resource after playback
+                setIsPlayingAudio(false);
+                stopAndReleaseSound();
             });
             setIsPlayingAudio(true);
         });
@@ -123,7 +114,6 @@ const QuestionsScreen = () => {
         if (isPlayingAudio) {
             stopAndReleaseSound();
         } else {
-            // Only play if there's an audio_path for the current question
             if (currentQuestion && currentQuestion.audio_path) {
                 playAudio(currentQuestion.audio_path);
             } else {
@@ -140,7 +130,9 @@ const QuestionsScreen = () => {
             const response = await apiCall('GET', `/tests/${testId}/questions`);
 
             if (response.ok && response.data) {
-                const shuffledQuestions = response.data.map(q => {
+                const shuffledQuestionsOrder = response.data.sort(() => Math.random() - 0.5);
+
+                const shuffledQuestions = shuffledQuestionsOrder.map(q => {
                     if (q.type_id === 1) { // Only shuffle answers for multiple-choice questions
                         return {
                             ...q,
@@ -156,7 +148,7 @@ const QuestionsScreen = () => {
                 setIsAnswered(false);
                 setCorrectAnswersCount(0);
                 setUserAnswersHistory([]);
-                stopAndReleaseSound(); // Stop and release any playing audio when new questions are fetched
+                stopAndReleaseSound();
             } else {
                 const message = response.data?.error || response.data?.message || 'Không thể tải câu hỏi.';
                 setError(message);
@@ -178,119 +170,99 @@ const QuestionsScreen = () => {
         }
     }, [testId, fetchQuestions]);
 
-    // Cleanup when component unmounts or navigates away
     useEffect(() => {
         return () => {
             stopAndReleaseSound();
         };
     }, [stopAndReleaseSound]);
 
-    // Use useFocusEffect to stop audio when screen loses focus (e.g., navigating back)
     useFocusEffect(
         useCallback(() => {
-            // When the screen gains focus
-            // console.log('QuestionsScreen focused');
             return () => {
-                // When the screen loses focus
                 console.log('QuestionsScreen blurred - stopping audio.');
                 stopAndReleaseSound();
             };
         }, [stopAndReleaseSound])
     );
 
-    // Stop audio when changing question
     useEffect(() => {
         stopAndReleaseSound();
-        // You might want to automatically play the audio for the new question here
-        // if (currentQuestion && currentQuestion.audio_path) {
-        //     playAudio(currentQuestion.audio_path);
-        // }
-    }, [currentQuestionIndex, questions, stopAndReleaseSound]); // Dependencies include currentQuestionIndex and questions
+    }, [currentQuestionIndex, questions, stopAndReleaseSound]);
+
+    useEffect(() => {
+        if (questions.length > 0) {
+            const historyEntry = userAnswersHistory.find(
+                (entry) => entry.questionId === questions[currentQuestionIndex]?.question_id
+            );
+
+            if (historyEntry) {
+                if (questions[currentQuestionIndex]?.type_id === 1) { // Multiple Choice
+                    setSelectedAnswerId(historyEntry.selectedAnswerId);
+                    setUserTextInput('');
+                } else if (questions[currentQuestionIndex]?.type_id === 2) { // Fill-in-the-blank
+                    setUserTextInput(historyEntry.answerText || '');
+                    setSelectedAnswerId(null);
+                }
+                setIsAnswered(true);
+            } else {
+                setSelectedAnswerId(null);
+                setUserTextInput('');
+                setIsAnswered(false);
+            }
+        }
+    }, [currentQuestionIndex, questions, userAnswersHistory]);
+
+    // Add navigation listener to prompt before leaving
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            // Prevent default behavior of leaving the screen
+            e.preventDefault();
+
+            // Prompt the user before leaving the screen
+            Alert.alert(
+                'Thoát khỏi bài làm?',
+                'Bạn có chắc muốn thoát khỏi bài làm không? Tiến độ hiện tại sẽ không được lưu.',
+                [
+                    { text: 'Không', style: 'cancel', onPress: () => {} },
+                    {
+                        text: 'Có',
+                        style: 'destructive',
+                        onPress: () => {
+                            stopAndReleaseSound(); // Stop audio if exiting
+                            navigation.dispatch(e.data.action); // Allow the navigation to proceed
+                        },
+                    },
+                ]
+            );
+        });
+
+        return unsubscribe;
+    }, [navigation, stopAndReleaseSound]);
+
 
     const handleAnswerPress = (answer) => {
-        if (isAnswered) {
-            return;
-        }
         setSelectedAnswerId(answer.answer_id);
         setIsAnswered(true);
-
-        const currentQuestion = questions[currentQuestionIndex];
-        const isCorrect = answer.is_correct;
-
-        if (isCorrect) {
-            setCorrectAnswersCount(prev => prev + 1);
-        }
-
-        setUserAnswersHistory(prev => [
-            ...prev,
-            {
-                questionId: currentQuestion.question_id,
-                selectedAnswerId: answer.answer_id,
-                answerText: answer.answer_text,
-                isCorrect: isCorrect,
-                questionType: currentQuestion.type_id,
-            }
-        ]);
     };
 
-    const handleTextInputSubmit = () => {
-        if (userTextInput.trim() === '') {
-            Alert.alert('Chưa nhập câu trả lời', 'Bạn phải nhập câu trả lời.');
-            return;
-        }
-
-        if (!isAnswered) {
-            setIsAnswered(true);
-
-            const currentQuestion = questions[currentQuestionIndex];
-            const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
-
-            if (isCorrect) {
-                setCorrectAnswersCount(prev => prev + 1);
-            }
-
-            setUserAnswersHistory(prev => [
-                ...prev,
-                {
-                    questionId: currentQuestion.question_id,
-                    selectedAnswerId: null,
-                    answerText: userTextInput.trim(),
-                    isCorrect: isCorrect,
-                    correctAnswerContent: currentQuestion.correct_answer,
-                    questionType: currentQuestion.type_id,
-                }
-            ]);
-        }
+    const handleTextInputChange = (text) => {
+        setUserTextInput(text);
+        setIsAnswered(text.trim() !== '');
     };
 
     const handleNextQuestion = async () => {
         const currentQuestion = questions[currentQuestionIndex];
 
-        if (currentQuestion.type_id === 2 && userTextInput.trim() !== '' && !isAnswered) {
-            // This block handles submitting answer for type 2 if not already answered on next press
-            const isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === userTextInput.trim().toLowerCase();
-            if (isCorrect) {
-                setCorrectAnswersCount(prev => prev + 1);
-            }
-            setUserAnswersHistory(prev => [
-                ...prev,
-                {
-                    questionId: currentQuestion.question_id,
-                    selectedAnswerId: null,
-                    answerText: userTextInput.trim(),
-                    isCorrect: isCorrect,
-                    correctAnswerContent: currentQuestion.correct_answer,
-                    questionType: currentQuestion.type_id,
-                }
-            ]);
-            setIsAnswered(true); // Mark as answered after processing
-        }
-
         let canProceed = false;
-        if (currentQuestion.type_id === 1) {
-            canProceed = isAnswered;
-        } else if (currentQuestion.type_id === 2) {
+        let finalSelectedAnswerId = null;
+        let finalUserTextInput = '';
+
+        if (currentQuestion.type_id === 1) { // Multiple Choice
+            canProceed = selectedAnswerId !== null;
+            finalSelectedAnswerId = selectedAnswerId;
+        } else if (currentQuestion.type_id === 2) { // Fill-in-the-blank
             canProceed = userTextInput.trim() !== '';
+            finalUserTextInput = userTextInput.trim();
         }
 
         if (!canProceed) {
@@ -298,10 +270,46 @@ const QuestionsScreen = () => {
             return;
         }
 
-        stopAndReleaseSound(); // Stop sound before moving to next question or finishing test
+        let isCorrect = false;
+        if (currentQuestion.type_id === 1) {
+            const selectedAns = currentQuestion.answers.find(ans => ans.answer_id === finalSelectedAnswerId);
+            isCorrect = selectedAns?.is_correct || false;
+        } else if (currentQuestion.type_id === 2) {
+            isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === finalUserTextInput.toLowerCase();
+        }
+
+        // Prepare the new entry for the current question
+        const newCurrentQuestionAnswerEntry = {
+            questionId: currentQuestion.question_id,
+            selectedAnswerId: finalSelectedAnswerId,
+            answerText: finalUserTextInput,
+            isCorrect: isCorrect,
+            questionType: currentQuestion.type_id,
+            correctAnswerContent: currentQuestion.type_id === 2 ? currentQuestion.correct_answer : null,
+        };
+
+        // Determine the final user answers history to be used for submission
+        let finalUserAnswersForSubmission;
+        const existingIndexInHistory = userAnswersHistory.findIndex(item => item.questionId === currentQuestion.question_id);
+
+        if (existingIndexInHistory > -1) {
+            // If the current question's answer already exists in history, update it
+            finalUserAnswersForSubmission = [...userAnswersHistory];
+            finalUserAnswersForSubmission[existingIndexInHistory] = newCurrentQuestionAnswerEntry;
+        } else {
+            // Otherwise, add it to the history
+            finalUserAnswersForSubmission = [...userAnswersHistory, newCurrentQuestionAnswerEntry];
+        }
+
+        // Update the userAnswersHistory state (this will trigger a re-render later, but not immediately for score calculation)
+        setUserAnswersHistory(finalUserAnswersForSubmission);
+
+        stopAndReleaseSound();
 
         if (currentQuestionIndex === questions.length - 1) {
-            await finishTest();
+            // For the last question, use the immediately prepared finalUserAnswersForSubmission
+            const finalCorrectCount = finalUserAnswersForSubmission.filter(item => item.isCorrect).length;
+            await finishTest(finalCorrectCount, finalUserAnswersForSubmission); // Pass final answers to finishTest
         } else {
             setCurrentQuestionIndex(prev => prev + 1);
             setSelectedAnswerId(null);
@@ -311,24 +319,31 @@ const QuestionsScreen = () => {
         }
     };
 
-    const finishTest = async () => {
+    const handlePreviousQuestion = () => {
+        if (currentQuestionIndex > 0) {
+            stopAndReleaseSound();
+            setCurrentQuestionIndex(prev => prev - 1);
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }
+    };
+
+    // Modified finishTest to accept userAnswersHistory directly
+    const finishTest = async (finalCorrectAnswersCount, submittedUserAnswers) => {
         setLoading(true);
-        let userId = null; // Khởi tạo userId là null
+        let userId = null;
         try {
-            // --- BẮT ĐẦU SỬA ĐỔI ---
             console.log('QuestionsScreen: Attempting to retrieve userInfo from AsyncStorage...');
             const userInfoString = await AsyncStorage.getItem('userInfo');
             
             if (userInfoString) {
                 const userInfo = JSON.parse(userInfoString);
-                userId = userInfo.userId; // Trích xuất userId từ đối tượng userInfo
+                userId = userInfo.userId;
                 console.log('QuestionsScreen: userId extracted from userInfo:', userId);
             } else {
                 console.warn('QuestionsScreen: userInfoString is NULL or undefined. User not logged in or data missing.');
             }
-            // --- KẾT THÚC SỬA ĐỔI ---
 
-            if (!userId) { // Kiểm tra userId đã được trích xuất
+            if (!userId) {
                 Alert.alert(
                     'Lỗi thông tin người dùng',
                     'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
@@ -349,7 +364,7 @@ const QuestionsScreen = () => {
                 return;
             }
 
-            const userIdInt = parseInt(userId, 10); // Parse userId sau khi đã chắc chắn nó tồn tại
+            const userIdInt = parseInt(userId, 10);
             if (isNaN(userIdInt)) {
                 Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
                 navigation.replace('Login');
@@ -357,15 +372,15 @@ const QuestionsScreen = () => {
             }
 
             const totalQuestions = questions.length;
-            const totalScore = Math.round((correctAnswersCount / totalQuestions) * 100);
+            const totalScore = Math.round((finalCorrectAnswersCount / totalQuestions) * 100);
 
             const payload = {
                 userId: userIdInt,
                 testId: testId,
                 score: totalScore,
                 totalQuestions: totalQuestions,
-                correctAnswers: correctAnswersCount,
-                userAnswers: userAnswersHistory,
+                correctAnswers: finalCorrectAnswersCount,
+                userAnswers: submittedUserAnswers, // Use the submittedUserAnswers
             };
 
             console.log('QuestionsScreen: Đang gửi kết quả bài làm:', payload);
@@ -375,7 +390,7 @@ const QuestionsScreen = () => {
                 console.log('QuestionsScreen: Kết quả bài làm đã được lưu thành công.');
                 Alert.alert(
                     'Hoàn thành bài kiểm tra!',
-                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${correctAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
+                    `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${finalCorrectAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
                     [
                         {
                             text: 'Xem lại kết quả',
@@ -384,9 +399,9 @@ const QuestionsScreen = () => {
                                     testId: testId,
                                     testTitle: testTitle,
                                     totalQuestions: totalQuestions,
-                                    correctAnswers: correctAnswersCount,
+                                    correctAnswers: finalCorrectAnswersCount,
                                     totalScore: totalScore,
-                                    userAnswersHistory: userAnswersHistory,
+                                    userAnswersHistory: submittedUserAnswers, // Pass submittedUserAnswers
                                     allQuestions: questions,
                                 });
                             }
@@ -444,160 +459,203 @@ const QuestionsScreen = () => {
 
     const currentQuestion = questions[currentQuestionIndex];
 
+    // Determine if the "Next" button should be enabled
+    const isNextButtonEnabled = 
+        (currentQuestion.type_id === 1 && selectedAnswerId !== null) ||
+        (currentQuestion.type_id === 2 && userTextInput.trim() !== '');
+
+    // Determine background color for nav arrow buttons (for bottom navigation)
+    const prevButtonBackgroundColor = currentQuestionIndex === 0 ? '#CCCCCC' : '#2196F3'; // Grey if at start, blue otherwise
+    const nextButtonArrowBackgroundColor = isNextButtonEnabled ? '#2196F3' : '#CCCCCC'; // Blue if enabled, gray if disabled
+
+
     return (
-        // Đã bỏ KeyboardAvoidingView
-        <View style={questionsStyles.container}> 
-            {/* Header */}
-            <View style={questionsStyles.header}>
+        <View style={questionsStyles.container}>
+            {/* Status Bar for notch area */}
+            <StatusBar barStyle="dark-content" backgroundColor="#F7F7F7" translucent={false} />
+
+            {/* Top Bar with Back Button and Progress Circles */}
+            <View style={questionsStyles.topBar}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backButton}>
                     <Image source={require('../images/login_signup/back.png')} style={questionsStyles.backIcon} />
                 </TouchableOpacity>
-                <Text style={questionsStyles.headerTitle}>
-                    {testTitle} ({currentQuestionIndex + 1}/{questions.length})
-                </Text>
-                <View style={{ width: 30 }} />
+
+                {/* Wrapper for progress circles to facilitate centering */}
+                <View style={questionsStyles.progressCirclesWrapper}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={questionsStyles.progressCirclesContentContainer}
+                    >
+                        {questions.map((_, index) => (
+                            <View
+                                key={index}
+                                style={[
+                                    questionsStyles.progressCircle,
+                                    index === currentQuestionIndex && questionsStyles.progressCircleActive,
+                                    index < currentQuestionIndex && questionsStyles.progressCircleCompleted,
+                                ]}
+                            >
+                                <Text style={[
+                                    questionsStyles.progressCircleText,
+                                    index === currentQuestionIndex && questionsStyles.progressCircleTextActive,
+                                    index < currentQuestionIndex && questionsStyles.progressCircleTextCompleted,
+                                ]}>
+                                    {index + 1}
+                                </Text>
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {/* Spacer to balance the back button for visual centering */}
+                {/* It's important that this spacer has the exact same dimensions as the backButton */}
+                <View style={questionsStyles.backButtonSpacer} />
             </View>
 
-            <ScrollView ref={scrollViewRef} style={questionsStyles.questionContentContainer}>
-                {/* Question Content */}
-                <Text style={questionsStyles.questionText}>{currentQuestion.content}</Text>
+            <ScrollView ref={scrollViewRef} contentContainerStyle={questionsStyles.questionContentScroll}>
+                {/* Question Card */}
+                <View style={questionsStyles.questionCard}>
+                    {/* Question Content */}
+                    <Text style={questionsStyles.questionText}>{currentQuestion.content}</Text>
 
-                {currentQuestion.image_path && (
-                    <Image
-                        source={{ uri: getFullImageUrl(currentQuestion.image_path) }}
-                        style={questionsStyles.questionImage}
-                        onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(currentQuestion.image_path))}
-                    />
-                )}
+                    {currentQuestion.image_path && (
+                        <Image
+                            source={{ uri: getFullImageUrl(currentQuestion.image_path) }}
+                            style={questionsStyles.questionImage}
+                            onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(currentQuestion.image_path))}
+                        />
+                    )}
 
-                {/* Audio Player */}
-                {currentQuestion.audio_path && (
-                    <View style={questionsStyles.audioPlayerContainer}>
-                        <TouchableOpacity onPress={toggleAudioPlayback} style={questionsStyles.playPauseButton}>
-                            <Image
-                                source={isPlayingAudio ? require('../images/pause.png') : require('../images/play.png')}
-                                style={questionsStyles.playPauseIcon}
-                            />
-                        </TouchableOpacity>
-                        <Text style={questionsStyles.audioFileName}>
-                            {currentQuestion.audio_path.split('/').pop()} {/* Show only file name */}
-                        </Text>
-                    </View>
-                )}
-
-                {/* Answers or Text Input based on type_id */}
-                <View style={questionsStyles.answersContainer}>
-                    {currentQuestion.type_id === 1 ? ( // Multiple Choice
-                        currentQuestion.answers.map((answer) => {
-                            const isSelected = selectedAnswerId === answer.answer_id;
-                            const isCorrectAnswer = answer.is_correct;
-
-                            let answerButtonColor = '#F0F0F0';
-                            let answerTextColor = '#333';
-                            if (isAnswered) {
-                                if (isCorrectAnswer) {
-                                    answerButtonColor = '#4CAF50';
-                                    answerTextColor = '#FFFFFF';
-                                } else if (isSelected && !isCorrectAnswer) {
-                                    answerButtonColor = '#F44336';
-                                    answerTextColor = '#FFFFFF';
-                                }
-                            } else if (isSelected) {
-                                answerButtonColor = '#BBDEFB';
-                                answerTextColor = '#1E90FF';
-                            }
-
-                            return (
-                                <TouchableOpacity
-                                    key={answer.answer_id.toString()}
-                                    style={[
-                                        questionsStyles.answerButton,
-                                        { backgroundColor: answerButtonColor }
-                                    ]}
-                                    onPress={() => handleAnswerPress(answer)}
-                                    disabled={isAnswered}
-                                >
-                                    <Text style={[questionsStyles.answerText, { color: answerTextColor }]}>
-                                        {answer.answer_text}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })
-                    ) : ( // Fill-in-the-blank (type_id = 2)
-                        <View style={questionsStyles.textInputContainer}>
-                            <TextInput
-                                style={questionsStyles.textInputField}
-                                placeholder="Nhập câu trả lời của bạn..."
-                                value={userTextInput}
-                                onChangeText={setUserTextInput}
-                                editable={!isAnswered}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                onSubmitEditing={handleTextInputSubmit}
-                                returnKeyType="done"
-                            />
-                            {isAnswered && (
-                                <View style={questionsStyles.feedbackContainer}>
-                                    <Text style={[
-                                        questionsStyles.feedbackText,
-                                        userAnswersHistory[userAnswersHistory.length - 1]?.isCorrect ? questionsStyles.correctFeedback : questionsStyles.incorrectFeedback
-                                    ]}>
-                                        {userAnswersHistory[userAnswersHistory.length - 1]?.isCorrect ? 'Đúng!' : `Sai! Đáp án đúng: ${currentQuestion.correct_answer}`}
-                                    </Text>
-                                </View>
-                            )}
+                    {/* Audio Player */}
+                    {currentQuestion.audio_path && (
+                        <View style={questionsStyles.audioPlayerContainer}>
+                            <TouchableOpacity onPress={toggleAudioPlayback} style={questionsStyles.playPauseButton}>
+                                <Image
+                                    source={isPlayingAudio ? require('../images/pause.png') : require('../images/play.png')}
+                                    style={questionsStyles.playPauseIcon}
+                                />
+                            </TouchableOpacity>
+                            <Text style={questionsStyles.audioFileName}>
+                                {currentQuestion.audio_path.split('/').pop()}
+                            </Text>
                         </View>
                     )}
+
+                    {/* Answers or Text Input based on type_id */}
+                    <View style={questionsStyles.answersContainer}>
+                        {currentQuestion.type_id === 1 ? ( // Multiple Choice
+                            currentQuestion.answers.map((answer) => {
+                                const isSelected = selectedAnswerId === answer.answer_id;
+                                let answerButtonColor = '#FFFFFF'; // Default white
+                                let answerBorderColor = '#D0D0D0'; // Default light gray border
+                                let answerTextColor = '#333';
+
+                                if (isSelected) {
+                                    answerButtonColor = '#E3F2FD'; // Light blue for selected
+                                    answerBorderColor = '#2196F3'; // Blue border
+                                    answerTextColor = '#2196F3';
+                                }
+
+                                return (
+                                    <TouchableOpacity
+                                        key={answer.answer_id.toString()}
+                                        style={[
+                                            questionsStyles.answerButton,
+                                            { backgroundColor: answerButtonColor, borderColor: answerBorderColor }
+                                        ]}
+                                        onPress={() => handleAnswerPress(answer)}
+                                    >
+                                        <Text style={[questionsStyles.answerText, { color: answerTextColor }]}>
+                                            {answer.answer_text}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        ) : ( // Fill-in-the-blank (type_id = 2)
+                            <View style={questionsStyles.textInputContainer}>
+                                <TextInput
+                                    style={questionsStyles.textInputField}
+                                    placeholder="Nhập câu trả lời của bạn..."
+                                    value={userTextInput}
+                                    onChangeText={handleTextInputChange}
+                                    editable={true}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    onSubmitEditing={handleNextQuestion}
+                                    returnKeyType="done"
+                                />
+                            </View>
+                        )}
+                    </View>
                 </View>
             </ScrollView>
 
-            {/* Navigation Button */}
-            <View style={questionsStyles.navigationButtonContainer}>
+            {/* Navigation Buttons Container at the bottom */}
+            <View style={questionsStyles.bottomNavigation}>
+                <TouchableOpacity
+                    onPress={handlePreviousQuestion}
+                    style={[
+                        questionsStyles.navArrowButton,
+                        { backgroundColor: prevButtonBackgroundColor }, // Dynamic background color
+                        currentQuestionIndex === 0 && questionsStyles.navArrowButtonDisabled, // Apply disabled opacity and no shadow
+                    ]}
+                    disabled={currentQuestionIndex === 0}
+                >
+                    <Image source={require('../images/left-arrow.png')} style={questionsStyles.navArrowIcon} />
+                </TouchableOpacity>
+
                 <TouchableOpacity
                     style={[
                         questionsStyles.nextButton,
-                        (currentQuestion.type_id === 1 && !isAnswered) ||
-                        (currentQuestion.type_id === 2 && userTextInput.trim() === '')
-                            ? questionsStyles.nextButtonDisabled
-                            : null
+                        !isNextButtonEnabled && questionsStyles.nextButtonDisabled
                     ]}
                     onPress={handleNextQuestion}
-                    disabled={
-                        (currentQuestion.type_id === 1 && !isAnswered) ||
-                        (currentQuestion.type_id === 2 && userTextInput.trim() === '')
-                    }
+                    disabled={!isNextButtonEnabled}
                 >
                     <Text style={questionsStyles.nextButtonText}>
-                        {currentQuestionIndex === questions.length - 1 ? 'Hoàn thành' : 'Câu hỏi tiếp theo'}
+                        {currentQuestionIndex === questions.length - 1 ? 'Submit Quiz' : 'Next'}
                     </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={handleNextQuestion}
+                    style={[
+                        questionsStyles.navArrowButton,
+                        { backgroundColor: nextButtonArrowBackgroundColor }, // Apply dynamic background color
+                        (!isNextButtonEnabled || currentQuestionIndex === questions.length - 1) && questionsStyles.navArrowButtonDisabled, // Apply disabled opacity and no shadow
+                        currentQuestionIndex === questions.length - 1 && questionsStyles.navArrowButtonHidden
+                    ]}
+                    disabled={!isNextButtonEnabled || currentQuestionIndex === questions.length - 1}
+                >
+                    <Image source={require('../images/right-arrow.png')} style={questionsStyles.navArrowIcon} />
+                </TouchableOpacity>
             </View>
-        </View> // <-- Đã đổi lại thành View
+        </View>
     );
 };
 
 const questionsStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E6EEF9', // Light blue-gray background for the entire screen
     },
-    header: {
+    topBar: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 15,
-        paddingTop: 50,
-        paddingBottom: 15,
-        backgroundColor: '#FFFFFF',
-        elevation: 4,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 50,
+        paddingBottom: 20,
+        backgroundColor: '#F7F7F7',
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        elevation: 5,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        zIndex: 1,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
+        shadowRadius: 5,
+        zIndex: 2,
+        position: 'relative',
     },
     backButton: {
         padding: 5,
@@ -607,18 +665,69 @@ const questionsStyles = StyleSheet.create({
         height: 24,
         tintColor: '#333',
     },
-    headerTitle: {
-        flex: 1,
-        textAlign: 'center',
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
+    progressCirclesWrapper: { // New wrapper style
+        flex: 1, // Takes up remaining space in the row
+        flexDirection: 'row', // Ensure children (ScrollView) are laid out in a row within this wrapper
+        justifyContent: 'center', // Centers the ScrollView horizontally if its content is smaller than wrapper
+        alignItems: 'center', // Centers the ScrollView vertically (though it's usually single line)
+        overflow: 'hidden', // Hide overflow content if ScrollView extends beyond its bounds
     },
-    questionContentContainer: {
+    backButtonSpacer: { // New spacer style
+        width: 34, // Approximate width of the back button (icon 24 + padding 5*2 = 34)
+    },
+    progressCirclesContentContainer: { // Renamed for clarity, applies to contentContainerStyle
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center', // Crucial for centering content within the scrollable area
+        minWidth: '100%', // Makes content container stretch to at least 100% of ScrollView's visible width for centering
+    },
+    progressCircle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        borderWidth: 2,
+        borderColor: '#BBDEFB',
+        backgroundColor: 'white',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 5,
+    },
+    progressCircleActive: {
+        borderColor: '#2196F3',
+        backgroundColor: '#2196F3',
+    },
+    progressCircleCompleted: {
+        borderColor: '#4CAF50',
+        backgroundColor: '#4CAF50',
+    },
+    progressCircleText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#757575',
+    },
+    progressCircleTextActive: {
+        color: 'white',
+    },
+    progressCircleTextCompleted: {
+        color: 'white',
+    },
+    questionContentScroll: {
         flex: 1,
         paddingHorizontal: 20,
-        paddingTop: 20,
-        marginTop: 110,
+        paddingTop: 10,
+        paddingBottom: 20,
+    },
+    questionCard: {
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 20,
+        marginTop: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 5,
     },
     questionText: {
         fontSize: 22,
@@ -638,7 +747,6 @@ const questionsStyles = StyleSheet.create({
         borderColor: '#DDD',
         borderWidth: 1,
     },
-    // New styles for audio player
     audioPlayerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -674,20 +782,21 @@ const questionsStyles = StyleSheet.create({
         fontWeight: '500',
     },
     answersContainer: {
-        marginBottom: 20,
+        marginBottom: 10,
     },
     answerButton: {
-        backgroundColor: '#F0F0F0',
+        backgroundColor: '#FFFFFF',
         paddingVertical: 15,
         paddingHorizontal: 20,
         borderRadius: 10,
         marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderWidth: 2,
+        borderColor: '#D0D0D0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowRadius: 3,
+        elevation: 2,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -728,29 +837,33 @@ const questionsStyles = StyleSheet.create({
     incorrectFeedback: {
         color: '#DC3545',
     },
-    navigationButtonContainer: {
-        padding: 20,
-        backgroundColor: '#FFFFFF',
-        borderTopWidth: 1,
-        borderTopColor: '#EEE',
+    bottomNavigation: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        backgroundColor: 'white',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -5 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+    },
+    nextButton: {
+        backgroundColor: '#2196F3', // Blue color when enabled
+        paddingVertical: 15,
+        paddingHorizontal: 30,
+        borderRadius: 30,
+        minWidth: width * 0.4,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    nextButton: {
-        backgroundColor: '#1E90FF',
-        paddingVertical: 15,
-        paddingHorizontal: 40,
-        borderRadius: 30,
-        minWidth: '70%',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#1E90FF',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
     nextButtonDisabled: {
-        backgroundColor: '#A0D8FF',
+        backgroundColor: '#CCCCCC', // Gray color when disabled
+        shadowColor: 'transparent',
         opacity: 0.7,
     },
     nextButtonText: {
@@ -758,11 +871,35 @@ const questionsStyles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
+    navArrowButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E0E0E0', // Default border for arrow buttons
+    },
+    navArrowButtonDisabled: {
+        opacity: 0.5,
+        borderColor: '#F0F0F0',
+        shadowOpacity: 0,
+        elevation: 0,
+        shadowColor: 'transparent',
+    },
+    navArrowButtonHidden: {
+        opacity: 0,
+    },
+    navArrowIcon: {
+        width: 24,
+        height: 24,
+        // Removed tintColor to use original image color (white/black from your provided images)
+    },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E6EEF9',
     },
     loadingText: {
         marginTop: 10,
@@ -774,7 +911,7 @@ const questionsStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E6EEF9',
     },
     errorText: {
         fontSize: 16,
@@ -797,12 +934,14 @@ const questionsStyles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F7F7F7',
+        backgroundColor: '#E6EEF9',
+        padding: 20,
     },
     noDataText: {
-        fontSize: 16,
+        fontSize: 18,
         color: '#777',
         marginBottom: 20,
+        textAlign: 'center',
     },
     backToTestsButton: {
         backgroundColor: '#6C757D',

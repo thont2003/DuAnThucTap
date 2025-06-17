@@ -86,13 +86,14 @@ const ChangePasswordScreen = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Đổi mật khẩu</Text>
+    <View style={styles.container}>
+        <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
+            </TouchableOpacity>
+            <Text style={styles.title}>Đổi mật khẩu</Text>
+        </View>
+
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Mật khẩu cũ</Text>
@@ -103,8 +104,19 @@ const ChangePasswordScreen = () => {
               value={oldPassword}
               onChangeText={setOldPassword}
             />
-            <TouchableOpacity onPress={() => setShowOld(!showOld)}>
-              <Image source={require('../images/login_signup/eye_1.png')} style={styles.eyeIcon} />
+            
+            <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowOld(!showOld)}
+            >
+                <Image
+                    source={
+                        showOld
+                            ? require('../images/login_signup/eye_1.png')
+                            : require('../images/login_signup/eye_2.png')
+                    }
+                    style={styles.toggleIcon}
+                />
             </TouchableOpacity>
           </View>
 
@@ -116,8 +128,18 @@ const ChangePasswordScreen = () => {
               value={newPassword}
               onChangeText={setNewPassword}
             />
-            <TouchableOpacity onPress={() => setShowNew(!showNew)}>
-              <Image source={require('../images/login_signup/eye_1.png')} style={styles.eyeIcon} />
+            <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowNew(!showNew)}
+            >
+                <Image
+                    source={
+                        showNew
+                            ? require('../images/login_signup/eye_1.png')
+                            : require('../images/login_signup/eye_2.png')
+                    }
+                    style={styles.toggleIcon}
+                />
             </TouchableOpacity>
           </View>
 
@@ -129,8 +151,18 @@ const ChangePasswordScreen = () => {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
             />
-            <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
-              <Image source={require('../images/login_signup/eye_1.png')} style={styles.eyeIcon} />
+            <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowConfirm(!showConfirm)}
+            >
+                <Image
+                    source={
+                        showConfirm
+                            ? require('../images/login_signup/eye_1.png')
+                            : require('../images/login_signup/eye_2.png')
+                    }
+                    style={styles.toggleIcon}
+                />
             </TouchableOpacity>
           </View>
 
@@ -139,16 +171,17 @@ const ChangePasswordScreen = () => {
             <Text style={styles.rule}>✓ Mật khẩu không được trùng số điện thoại/username</Text>
             <Text style={styles.rule}>✓ Phải có chữ thường, chữ hoa, và số</Text>
           </View>
-
-          <TouchableOpacity
-            style={[styles.saveButton, loading && { opacity: 0.5 }]}
-            onPress={handleChangePassword}
-            disabled={loading}
-          >
-            <Text style={styles.saveButtonText}>{loading ? 'Đang lưu...' : 'Lưu'}</Text>
-          </TouchableOpacity>
         </View>
-      </ScrollView>
+
+            <View style={styles.footer}>
+                <TouchableOpacity 
+                    style={[styles.saveButton, loading && { opacity: 0.5 }]}
+                    onPress={handleChangePassword} 
+                    disabled={loading}
+                >
+                <Text style={styles.saveButtonText}>{loading ? 'Đang lưu...' : 'Sửa'}</Text>
+                </TouchableOpacity>
+            </View>
 
       <CustomAlertDialog
         isVisible={isAlertVisible}
@@ -163,15 +196,32 @@ const ChangePasswordScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    flex: 1,
+    backgroundColor: '#fff',
   },
+    header: {
+        alignItems: 'center',
+        paddingHorizontal: 15,
+        paddingVertical: 15,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        paddingHorizontal: 15,
+        paddingTop: 50,
+        paddingBottom: 15,
+        zIndex: 1000,
+        elevation: 10,
+    },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 25,
-    marginTop: 10,
-    textAlign: 'center',
-    color: '#1C2B33',
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        textAlign: 'center',
+  },
+  inputGroup: {
+        flex: 1,
+        margin: 20,
+        marginTop: 40,
   },
   label: {
     fontSize: 14,
@@ -182,23 +232,28 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: '#CCC',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 12,
     marginBottom: 20,
   },
   input: {
     flex: 1,
+    height: 60,
     paddingVertical: 10,
     fontSize: 16,
     color: '#000',
   },
-  eyeIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#888',
-  },
+    passwordToggle: {
+        padding: 5,
+    },
+    toggleIcon: {
+        width: 20,
+        height: 20,
+        tintColor: '#000',
+        resizeMode: 'contain',
+    },
   rulesContainer: {
     marginBottom: 20,
   },
@@ -207,17 +262,31 @@ const styles = StyleSheet.create({
     color: '#444',
     marginBottom: 5,
   },
-  saveButton: {
-    backgroundColor: '#1E90FF',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+    footer: {
+        height: 100,
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        padding: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        zIndex: 1000,
+        elevation: 10,
+    },
+    saveButton: {
+        backgroundColor: '#007AFF',
+        borderRadius: 10,
+        paddingVertical: 15,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
   backButton: {
     position: 'absolute',
     top: 50,
