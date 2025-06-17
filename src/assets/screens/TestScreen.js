@@ -127,30 +127,18 @@ const TestScreen = () => {
     };
 
     const handleTestPress = async (test) => {
-        // Increment play_count on the backend
-        try {
-            const response = await apiCall('POST', `/tests/${test.test_id}/start`);
-            if (response.ok) {
-                console.log(`Play count for test ${test.test_id} incremented.`);
-                // Optionally refetch tests to update the play_count immediately in the UI
-                fetchTests();
-            } else {
-                console.error('Failed to increment play count:', response.data?.error || response.data?.message);
-            }
-        } catch (error) {
-            console.error('Error incrementing play count:', error);
-        }
-
-        // NEW: Navigate to DetailTestScreen, passing all necessary test data as parameters
+        // Navigate to DetailTestScreen, passing all necessary test data as parameters
+        // The play_count increment will now happen in DetailTestScreen
         navigation.navigate('DetailTest', {
             testId: test.test_id,
             testTitle: test.title,
             description: test.description,
             questionCount: test.question_count,
-            playCount: test.play_count,
+            playCount: test.play_count, // Pass the current play_count to DetailTestScreen
             imageUrl: test.image_url,
             levelId: levelId,      // Pass current levelId for context in DetailTestScreen
             levelName: levelName,  // Pass current levelName for context in DetailTestScreen
+            onGoBack: fetchTests, // Pass fetchTests as a callback to re-fetch tests when returning
         });
     };
 

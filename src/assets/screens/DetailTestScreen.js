@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BASE_URL } from '../utils/constants';
+import { apiCall } from '../utils/api'; // Import apiCall
 
 const { width, height } = Dimensions.get('window');
 
@@ -9,10 +10,8 @@ const DetailTestScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
 
-    // Đảm bảo nhận các tham số cần thiết từ route.params
-    // Đã thêm questionCount và playCount vì chúng ta cần truyền chúng sang QuestionsScreen
-    // hoặc có thể bỏ qua nếu QuestionsScreen tự fetch
-    const { testId, testTitle, description, questionCount, playCount, imageUrl, levelName } = route.params;
+    const { testId, testTitle, description, questionCount, playCount, imageUrl, levelName, onGoBack } = route.params;
+    const [currentPlayCount, setCurrentPlayCount] = useState(playCount || 0); // State to manage play_count
 
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) return '';
@@ -20,13 +19,32 @@ const DetailTestScreen = () => {
         return `${BASE_URL}/images/${imageFileName}`;
     };
 
-    const handleStartTest = () => {
-        // CẬP NHẬT DÒNG NÀY: Dùng navigation.navigate để chuyển trang
+    const handleStartTest = async () => {
+        // Increment play_count on the backend
+        try {
+            const response = await apiCall('POST', `/tests/${testId}/start`);
+            if (response.ok) {
+                console.log(`Play count for test ${testId} incremented.`);
+                // Update the local state for play_count
+                setCurrentPlayCount(prevCount => prevCount + 1);
+                // Call the callback to refresh tests in TestScreen if available
+                if (onGoBack) {
+                    onGoBack();
+                }
+            } else {
+                const message = response.data?.error || response.data?.message || 'Không thể cập nhật số lần làm.';
+                console.error('Failed to increment play count:', message);
+                Alert.alert('Lỗi', `Không thể cập nhật số lần làm: ${message}`);
+            }
+        } catch (error) {
+            console.error('Error incrementing play count:', error);
+            Alert.alert('Lỗi', 'Không thể kết nối đến server để cập nhật số lần làm.');
+        }
+
+        // Navigate to QuestionsScreen
         navigation.navigate('Questions', {
             testId: testId,
             testTitle: testTitle,
-            // Bạn có thể truyền thêm các thông tin khác nếu QuestionsScreen cần
-            // Ví dụ: levelId, levelName nếu muốn hiển thị trong QuestionsScreen
             levelName: levelName,
         });
     };
@@ -58,10 +76,9 @@ const DetailTestScreen = () => {
             {/* Content Section */}
             <View style={styles.content}>
                 <Text style={styles.title}>{testTitle || 'Title'}</Text>
-                {/* Thêm các thông tin khác nếu bạn muốn hiển thị */}
                 <Text style={styles.description}>{description}</Text>
                 <Text style={styles.stats}>Số câu hỏi: {questionCount || 'Đang cập nhật'}</Text>
-                <Text style={styles.stats}>Số lần làm: {playCount || 0}</Text>
+                <Text style={styles.stats}>Số lần làm: {currentPlayCount}</Text>
             </View>
 
             {/* Start Button */}

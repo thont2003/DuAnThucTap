@@ -39,6 +39,10 @@ const AccountScreen = () => {
     navigation.navigate('EditProfileScreen');
   };
   
+    const handlePressContact = () => {
+    navigation.navigate('ContactSupportScreen');
+  };
+  
   const handlePressSwichPassword = (optionName) => {
   if (optionName === 'Đổi mật khẩu') {
     navigation.navigate('ChangePasswordScreen');
@@ -116,7 +120,7 @@ const AccountScreen = () => {
           <Text style={styles.optionText}>Đổi mật khẩu</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionItem} onPress={() => handlePressOtherOption('Liên hệ/Hỗ trợ')}>
+        <TouchableOpacity style={styles.optionItem} onPress={() => handlePressContact('Liên hệ/Hỗ trợ')}>
           <View style={styles.optionIconContainer}>
             <Image
               source={require('../images/profile/support.png')}

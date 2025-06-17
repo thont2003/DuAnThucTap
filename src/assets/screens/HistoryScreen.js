@@ -1,4 +1,4 @@
-//HistoryScreen.js
+// HistoryScreen
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
@@ -10,12 +10,12 @@ import {
     ActivityIndicator,
     Alert,
     RefreshControl, // For pull-to-refresh
-    Platform,
-    StatusBar,
+    Platform, // Import Platform for OS-specific styling
+    StatusBar, // Import StatusBar
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiCall } from '../utils/api'; // Đảm bảo đường dẫn đúng
+import { apiCall } from '../utils/api'; // Ensure correct path
 
 const HistoryScreen = () => {
     const navigation = useNavigation();
@@ -45,25 +45,23 @@ const HistoryScreen = () => {
         setError(null);
         let userId = null;
         try {
-            // --- BẮT ĐẦU SỬA ĐỔI ---
-            // Lấy chuỗi JSON của 'userInfo' từ AsyncStorage
+            // Get JSON string of 'userInfo' from AsyncStorage
             const userInfoString = await AsyncStorage.getItem('userInfo');
             console.log('HistoryScreen: Fetched userInfoString from AsyncStorage:', userInfoString);
 
             if (userInfoString) {
                 const userInfo = JSON.parse(userInfoString);
-                userId = userInfo.userId; // Trích xuất userId từ đối tượng userInfo
+                userId = userInfo.userId; // Extract userId from userInfo object
                 console.log('HistoryScreen: Extracted userId from userInfo:', userId);
             }
-            // --- KẾT THÚC SỬA ĐỔI ---
 
             if (!userId) {
                 setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
-                // Tùy chọn: điều hướng đến màn hình đăng nhập nếu userId bị thiếu
+                // Optional: navigate to login screen if userId is missing
                 // navigation.replace('Login');
                 return;
             }
-            setCurrentUserId(userId); // Lưu userId vào state
+            setCurrentUserId(userId); // Save userId to state
 
             const response = await apiCall('GET', `/history/user/${userId}`);
             console.log('HistoryScreen: API response for history:', response);
@@ -151,18 +149,20 @@ const HistoryScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={styles.fullScreenContainer}>
             <StatusBar
                 barStyle="dark-content"
-                backgroundColor="#f0f2f5"
+                backgroundColor="white" // Set status bar background color to white
+                translucent={false} // Important for Android to apply background color correctly
             />
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Lịch sử bài làm</Text>
-                <View style={{ width: 30 }} />{/* Spacer */}
+            <View style={styles.headerWrapper}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Lịch sử bài làm</Text>
+                    <View style={{ width: 30 }} />
+                </View>
             </View>
 
             <ScrollView
@@ -174,7 +174,7 @@ const HistoryScreen = () => {
                 {history.length === 0 ? (
                     <View style={styles.noHistoryContainer}>
                         <Image
-                            source={require('../images/research.png')} // Bạn cần thêm icon này
+                            source={require('../images/research.png')} // You need to add this icon
                             style={styles.emptyHistoryIcon}
                         />
                         <Text style={styles.noHistoryText}>Chưa có lịch sử làm bài nào.</Text>
@@ -182,7 +182,6 @@ const HistoryScreen = () => {
                     </View>
                 ) : (
                     <>
-                        
                         {history.map((item) => (
                             <TouchableOpacity
                                 key={item.history_id}
@@ -207,24 +206,29 @@ const HistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
+    fullScreenContainer: {
         flex: 1,
-        backgroundColor: '#E0E5FF', // Light gray background
+        backgroundColor: '#E0E5FF', // Light blue background for the entire screen below header
+    },
+    headerWrapper: { // New View to ensure white background behind status bar and header
+        backgroundColor: 'white', // This will cover the status bar area
+        // Add padding for Android's status bar height to prevent content overlap
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, 
+        elevation: 4, // Add elevation for shadow effect
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        zIndex: 1, // Ensure header is above other content
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 15,
-        paddingTop: 50,
         paddingBottom: 15,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#FFFFFF', // Header background color
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
     },
     backButton: {
         padding: 5,
@@ -245,12 +249,13 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         padding: 20,
         paddingTop: 10,
+        backgroundColor: '#E0E5FF', // Background color for scrollable content area
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f0f2f5',
+        backgroundColor: '#E0E5FF', // Updated to match content background
     },
     loadingText: {
         marginTop: 10,
@@ -262,7 +267,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
-        backgroundColor: '#f0f2f5',
+        backgroundColor: '#E0E5FF', // Updated to match content background
     },
     errorText: {
         fontSize: 16,

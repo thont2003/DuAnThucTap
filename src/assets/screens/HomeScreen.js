@@ -283,7 +283,7 @@ const HomeScreen = ({ route }) => {
                         >
                             <View style={homeStyles.categoryCard}>
                                 <Image
-                                    source={{ uri: getFullImageUrl(item.image_url) }}
+                                    source={{ uri: `${BASE_URL}${item.image_url}` }}
                                     style={homeStyles.categoryImage}
                                     resizeMode="contain"
                                     onError={(e) => console.log('Lỗi tải ảnh Level:', e.nativeEvent.error, 'URL:', getFullImageUrl(item.image_url))}
