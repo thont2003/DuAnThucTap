@@ -30,6 +30,7 @@ import EditQuestionScreen from '../screens/admin/EditQuestionScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen.js';
 import ContactSupportScreen from '../screens/ContactSupportScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -221,6 +222,11 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="ContactSupportScreen"
                     component={ContactSupportScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="ForgotPasswordScreen"
+                    component={ForgotPasswordScreen}
                     options={{ headerShown: false }}
                 />
             </Stack.Navigator>

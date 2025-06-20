@@ -103,6 +103,7 @@ const HomeScreen = ({ route }) => {
                 clearTimeout(scrollTimeoutRef.current);
             }
             scrollTimeoutRef.current = setTimeout(() => {
+                setShowNotification(true);
                 setBannerIndex((prevIndex) => {
                     const nextIndex = (prevIndex + 1) % bannerImages.length;
                     if (flatListRef.current) {

@@ -63,16 +63,24 @@ const LoginScreen = () => {
   };
 
   // --- Cập nhật phần xử lý nút back cứng trên Android ---
-  useEffect(() => {
-    const backAction = () => {
-      navigation.popToTop();
-      return true;
-    };
+useEffect(() => {
+  const loadRememberedCredentials = async () => {
+    try {
+      const savedEmail = await AsyncStorage.getItem('rememberedEmail');
+      const savedPassword = await AsyncStorage.getItem('rememberedPassword');
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      if (savedEmail && savedPassword) {
+        setEmail(savedEmail);
+        setPassword(savedPassword);
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải Remember Me:', error);
+    }
+  };
 
-    return () => backHandler.remove();
-  }, [navigation]);
+  loadRememberedCredentials();
+}, []);
   // --- Kết thúc cập nhật phần xử lý nút back cứng ---
 
   const handleLogin = async () => {
@@ -145,6 +153,15 @@ const LoginScreen = () => {
         } else {
           showCustomAlert('Lỗi', 'Tài khoản không hợp lệ hoặc không có quyền.');
         }
+        
+        // ✅ Ghi nhớ tài khoản nếu bật
+        if (rememberMe) {
+          await AsyncStorage.setItem('rememberedEmail', email);
+          await AsyncStorage.setItem('rememberedPassword', password);
+        } else {
+          await AsyncStorage.removeItem('rememberedEmail');
+          await AsyncStorage.removeItem('rememberedPassword');
+        } 
       } else {
         const errorMessage = response.data?.error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.';
         showCustomAlert('Lỗi', errorMessage);
@@ -157,6 +174,10 @@ const LoginScreen = () => {
     }
   };
 
+    const goToIntro = () => {
+    navigation.navigate('IntroScreen');
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#e0e8ff" />
@@ -164,13 +185,13 @@ const LoginScreen = () => {
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps="handled"
-        extraScrollHeight={Platform.OS === 'ios' ? 80 : 100} // Điều chỉnh khoảng cách giữa input và bàn phím
+        extraScrollHeight={Platform.OS === 'ios' ? 80 : 0} // Điều chỉnh khoảng cách giữa input và bàn phím
         enableOnAndroid={true}
         enableAutomaticScroll={(event) => {
           scrollViewRef.current?.scrollToFocusedInput(ReactNative.findNodeHandle(event.target));
         }}
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.popToTop()}>
+        <TouchableOpacity style={styles.backButton} onPress={goToIntro}>
           <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
         </TouchableOpacity>
 
@@ -238,7 +259,7 @@ const LoginScreen = () => {
               )}
               <Text style={styles.rememberMeText}>Remember me</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => showCustomAlert('Thông báo', 'Chức năng Quên mật khẩu đang được phát triển.')}>
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
               <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
           </View>

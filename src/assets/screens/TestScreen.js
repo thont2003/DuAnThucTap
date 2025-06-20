@@ -375,7 +375,7 @@ const testStyles = StyleSheet.create({
         shadowRadius: 2,
     },
     testImage: {
-        width: 180,
+        width: '50%',
         height: 80,
         borderRadius: 8,
         borderColor: '#ccc',
@@ -388,7 +388,6 @@ const testStyles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 8,
-
         marginRight: 15,
         backgroundColor: '#e0e0e0',
         justifyContent: 'center',

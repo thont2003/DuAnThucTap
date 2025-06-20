@@ -123,7 +123,7 @@ const RegisterScreen = () => {
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps="handled"
-        extraScrollHeight={Platform.OS === 'ios' ? 80 : 100} // Điều chỉnh khoảng cách giữa input và bàn phím
+        extraScrollHeight={Platform.OS === 'ios' ? 80 : 0} // Điều chỉnh khoảng cách giữa input và bàn phím
         enableOnAndroid={true}
         enableAutomaticScroll={(event) => {
           scrollViewRef.current?.scrollToFocusedInput(ReactNative.findNodeHandle(event.target));
