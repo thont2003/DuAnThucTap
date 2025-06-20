@@ -111,6 +111,131 @@ const uploadUnitImage = multer({
 });
 
 
+// Tạo thư mục nếu nó không tồn tại
+if (!fs.existsSync(testImagesDir)) {
+    fs.mkdirSync(testImagesDir, { recursive: true });
+}
+
+// Cấu hình Express để phục vụ ảnh tĩnh từ thư mục này
+app.use('/images/tests', express.static(testImagesDir));
+
+// Cấu hình Multer storage cho ảnh bài test
+const testImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, testImagesDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const filename = `test-${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, filename);
+    }
+});
+
+// Instance Multer để xử lý tải ảnh bài test
+const uploadTestImage = multer({
+    storage: testImageStorage,
+    fileFilter: (req, file, cb) => {
+        const filetypes = /png|jpg|jpeg|gif/; // Bạn có thể thêm các định dạng khác nếu cần
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Chỉ hỗ trợ file ảnh (PNG, JPG, JPEG, GIF).'));
+    },
+    limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn kích thước file 5MB
+});
+
+// Cập nhật hàm deleteImageFile để xử lý ảnh tests
+// Đảm bảo hàm này được định nghĩa ở một nơi có thể truy cập được
+const deleteTestImageFile = (relativeFilePath) => {
+    if (!relativeFilePath) return;
+
+    let fullPath;
+    if (relativeFilePath.startsWith('/images/units/')) {
+        fullPath = path.join(__dirname, '..', 'src', 'assets', 'images', 'units', path.basename(relativeFilePath));
+    } else if (relativeFilePath.startsWith('/images/questions/')) {
+        fullPath = path.join(__dirname, '..', 'src', 'assets', 'images', 'questions', path.basename(relativeFilePath));
+    } else if (relativeFilePath.startsWith('/images/tests/')) { // Thêm điều kiện cho ảnh tests
+        fullPath = path.join(__dirname, '..', 'src', 'assets', 'images', 'tests', path.basename(relativeFilePath));
+    }
+    else {
+        console.warn('Đường dẫn ảnh không hợp lệ hoặc nằm ngoài thư mục cho phép:', relativeFilePath);
+        return;
+    }
+
+    fs.unlink(fullPath, (err) => {
+        if (err) {
+            console.error(`Lỗi khi xóa file ảnh cũ: ${fullPath}`, err);
+        } else {
+            console.log(`Đã xóa file ảnh cũ: ${fullPath}`);
+        }
+    });
+};
+
+// ////////////////////////QUESTIONS///////////////
+// Định nghĩa thư mục lưu trữ ảnh câu hỏi
+const questionImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'questions');
+
+// Tạo thư mục nếu nó không tồn tại
+if (!fs.existsSync(questionImagesDir)) {
+    fs.mkdirSync(questionImagesDir, { recursive: true });
+}
+
+// Cấu hình Express để phục vụ ảnh tĩnh từ thư mục này
+// Đường dẫn URL sẽ là /images/questions/tên_file.jpg
+app.use('/images/questions', express.static(questionImagesDir));
+
+// Cấu hình Multer storage cho ảnh câu hỏi
+const questionImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, questionImagesDir), // Lưu vào thư mục ảnh câu hỏi
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        // Đặt tên file độc đáo để tránh trùng lặp
+        const filename = `question-${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, filename);
+    }
+});
+
+// Instance Multer để xử lý tải ảnh câu hỏi
+const uploadQuestionImage = multer({
+    storage: questionImageStorage,
+    fileFilter: (req, file, cb) => {
+        // Chỉ chấp nhận các loại file ảnh nhất định
+        const filetypes = /png|jpg|jpeg|gif/; // Bạn có thể thêm các định dạng khác nếu cần
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Chỉ hỗ trợ file ảnh (PNG, JPG, JPEG, GIF).'));
+    },
+    limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn kích thước file 5MB
+});
+
+// Hàm hỗ trợ xóa file ảnh vật lý trên server
+// Hàm này có thể xử lý cả ảnh units và questions
+const deleteImageFile = (relativeFilePath) => {
+    if (!relativeFilePath) return;
+
+    let fullPath;
+    // Xác định thư mục gốc của file dựa trên tiền tố đường dẫn tương đối
+    if (relativeFilePath.startsWith('/images/units/')) {
+        fullPath = path.join(__dirname, '..', 'src', 'assets', 'images', 'units', path.basename(relativeFilePath));
+    } else if (relativeFilePath.startsWith('/images/questions/')) {
+        fullPath = path.join(__dirname, '..', 'src', 'assets', 'images', 'questions', path.basename(relativeFilePath));
+    } else {
+        console.warn('Đường dẫn ảnh không hợp lệ hoặc nằm ngoài thư mục cho phép:', relativeFilePath);
+        return;
+    }
+
+    fs.unlink(fullPath, (err) => {
+        if (err) {
+            console.error(`Lỗi khi xóa file ảnh cũ: ${fullPath}`, err);
+        } else {
+            console.log(`Đã xóa file ảnh cũ: ${fullPath}`);
+        }
+    });
+};
+
 // Cung cấp các file tĩnh khác
 app.use('/audio', express.static('public/audio'));
 app.use('/images', express.static('public/images'));
