@@ -61,7 +61,7 @@ const ResultScreen = () => {
         if (imageFileName.startsWith('http://') || imageFileName.startsWith('https://')) {
             return imageFileName;
         }
-        return `${BASE_URL}/images/${imageFileName}`; // Assuming images are in /images directory
+        return `${BASE_URL}${imageFileName}`; // Assuming images are in /images directory
     };
 
     // Helper to get full audio URL

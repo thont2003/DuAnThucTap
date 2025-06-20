@@ -29,6 +29,8 @@ import QuestionListScreen from '../screens/admin/QuestionListScreen';
 import EditQuestionScreen from '../screens/admin/EditQuestionScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen.js';
+import TestSelectorScreen from '../screens/admin/TestSelectorScreen';
+import TestADScreen from '../screens/admin/TestADScreen';
 import ContactSupportScreen from '../screens/ContactSupportScreen';
 
 
@@ -216,6 +218,16 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="UserManagementScreen"
                     component={UserManagementScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="TestSelectorScreen"
+                    component={TestSelectorScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="TestADScreen"
+                    component={TestADScreen}
                     options={{ headerShown: false }}
                 />
                 <Stack.Screen

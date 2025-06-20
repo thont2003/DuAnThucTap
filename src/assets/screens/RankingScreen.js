@@ -154,9 +154,6 @@ const RankingScreen = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Bảng Xếp Hạng</Text>
                 <View style={{ width: 30 }} />
             </View>
@@ -248,34 +245,18 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingTop: 50,
-        paddingBottom: 15,
-        backgroundColor: '#FFFFFF',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        zIndex: 1,
-    },
-    backButton: {
-        padding: 5,
-    },
-    backIcon: {
-        width: 24,
-        height: 24,
-        tintColor: '#333',
-    },
-    headerTitle: {
-        flex: 1,
-        textAlign: 'center',
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
-    },
+    paddingTop: 50,
+    paddingBottom: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
     scrollContent: {
         paddingVertical: 20,
         paddingHorizontal: 15,

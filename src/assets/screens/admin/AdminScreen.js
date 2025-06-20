@@ -51,6 +51,12 @@ const AdminScreen = () => {
                 <Text style={styles.buttonText}>Quản lý Đơn vị (Unit)</Text>
             </TouchableOpacity>
             <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#00ff00' }]}
+                onPress={() => navigation.navigate('TestADScreen')}
+            >
+                <Text style={styles.buttonText}>Quản lý bài tập (Test)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
                 style={[styles.button, { backgroundColor: '#28a745' }]}
                 onPress={() => navigation.navigate('QuestionTypeScreen')}
             >
@@ -61,7 +67,7 @@ const AdminScreen = () => {
                 style={[styles.button, { backgroundColor: '#dc3545' }]}
                 onPress={() => navigation.navigate('UserManagementScreen')}
             >
-                <Text style={styles.buttonText}>Quản lý Câu hỏi</Text>
+                <Text style={styles.buttonText}>Quản lý người dùng</Text>
             </TouchableOpacity>
 
             {/* Nút Đăng xuất */}

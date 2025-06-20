@@ -29,7 +29,7 @@ const TestScreen = () => {
         if (imageFileName.startsWith('http://') || imageFileName.startsWith('https://')) {
             return imageFileName;
         }
-        return `${BASE_URL}/images/${imageFileName}`;
+        return `${BASE_URL}${imageFileName}`;
     };
 
     // Define fetchTests as a useCallback hook to make it accessible and stable

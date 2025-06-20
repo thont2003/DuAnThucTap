@@ -143,14 +143,14 @@ const RegisterScreen = () => {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.loginTitle}>Register</Text>
+          <Text style={styles.loginTitle}>Đăng Ký</Text>
 
-          <Text style={styles.inputLabel}>Username</Text>
+          <Text style={styles.inputLabel}>Tên tài khoản</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={usernameRef}
               style={styles.input}
-              placeholder="Your username"
+              placeholder="Nhập tên tài khoản"
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -161,12 +161,12 @@ const RegisterScreen = () => {
             />
           </View>
 
-          <Text style={styles.inputLabel}>Email address</Text>
+          <Text style={styles.inputLabel}>Địa chỉ email</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={emailRef}
               style={styles.input}
-              placeholder="Your email address"
+              placeholder="Nhập địa chỉ email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -178,12 +178,12 @@ const RegisterScreen = () => {
             />
           </View>
 
-          <Text style={styles.inputLabel}>Password</Text>
+          <Text style={styles.inputLabel}>Mật khẩu</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={passwordRef}
               style={styles.input}
-              placeholder="Your password"
+              placeholder="Nhập mật khẩu"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -204,12 +204,12 @@ const RegisterScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.inputLabel}>Confirm Password</Text>
+          <Text style={styles.inputLabel}>Xác nhận mật khẩu</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={confirmPasswordRef}
               style={styles.input}
-              placeholder="Confirm your password"
+              placeholder="Nhập lại mật khẩu"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
@@ -234,13 +234,13 @@ const RegisterScreen = () => {
           </View>
 
           <TouchableOpacity style={styles.loginButton} onPress={handleRegister} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Register</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Đăng ký</Text>}
           </TouchableOpacity>
 
           <View style={styles.signUpContainer}>
-            <Text style={styles.dontHaveAccountText}>Already have an account? </Text>
+            <Text style={styles.dontHaveAccountText}>Bạn đã có tài khoản? </Text>
             <TouchableOpacity onPress={() => navigation.replace('Login')}>
-              <Text style={styles.signupText}>Login</Text>
+              <Text style={styles.signupText}>Đăng nhập ngay</Text>
             </TouchableOpacity>
           </View>
         </View>
