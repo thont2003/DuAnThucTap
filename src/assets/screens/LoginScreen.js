@@ -238,8 +238,8 @@ const LoginScreen = () => {
               )}
               <Text style={styles.rememberMeText}>Nhớ tài khoản</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => showCustomAlert('Thông báo', 'Chức năng Quên mật khẩu đang được phát triển.')}>
-              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
+              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
           </View>
 
