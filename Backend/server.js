@@ -47,6 +47,33 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
 
+////////////////Units/////////////////////
+const unitImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'units');
+if (!fs.existsSync(unitImagesDir)) fs.mkdirSync(unitImagesDir, { recursive: true });
+
+app.use('/images/units', express.static(unitImagesDir));
+
+const unitImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, unitImagesDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, filename);
+    }
+});
+
+const uploadUnitImage = multer({
+    storage: unitImageStorage,
+    fileFilter: (req, file, cb) => {
+        const filetypes = /png|jpg|jpeg/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) return cb(null, true);
+        cb(new Error('Chỉ hỗ trợ file PNG, JPG hoặc JPEG.'));
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
+
 /////////////////////////Tests///////////////////
 const testImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'tests');
 
