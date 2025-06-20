@@ -47,69 +47,8 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
 
-// Cấu hình thư mục lưu trữ ảnh cấp độ
-const levelImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'levels');
-if (!fs.existsSync(levelImagesDir)) {
-    fs.mkdirSync(levelImagesDir, { recursive: true });
-}
-
-// Cung cấp các file ảnh cấp độ tĩnh
-app.use('/images/levels', express.static(levelImagesDir));
-// Cấu hình Multer để tải lên ảnh cấp độ
-// Cấu hình Multer để tải lên ảnh cấp độ
-const levelImageStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, levelImagesDir); // Use the dedicated directory for level images
-    },
-    filename: (req, file, cb) => {
-        const ext = '.png';
-        // CORRECTED: Use backticks (`) for template literals
-        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-        cb(null, filename);
-    }
-});
-
-const uploadLevelImage = multer({
-    storage: levelImageStorage,
-    fileFilter: (req, file, cb) => {
-        const filetypes = /png|jpg|jpeg/;
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = filetypes.test(file.mimetype);
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error('Chỉ hỗ trợ file PNG/JPG/JPEG.'));
-    },
-    limits: { fileSize: 5 * 1024 * 1024 } // Limit 5MB
-});
-
-/////////////////////////////////////
-const unitImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'units');
-if (!fs.existsSync(unitImagesDir)) fs.mkdirSync(unitImagesDir, { recursive: true });
-
-app.use('/images/units', express.static(unitImagesDir));
-
-const unitImageStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, unitImagesDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-        cb(null, filename);
-    }
-});
-
-const uploadUnitImage = multer({
-    storage: unitImageStorage,
-    fileFilter: (req, file, cb) => {
-        const filetypes = /png|jpg|jpeg/;
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = filetypes.test(file.mimetype);
-        if (mimetype && extname) return cb(null, true);
-        cb(new Error('Chỉ hỗ trợ file PNG, JPG hoặc JPEG.'));
-    },
-    limits: { fileSize: 5 * 1024 * 1024 }
-});
-
+/////////////////////////Tests///////////////////
+const testImagesDir = path.join(__dirname, '..', 'src', 'assets', 'images', 'tests');
 
 // Tạo thư mục nếu nó không tồn tại
 if (!fs.existsSync(testImagesDir)) {
