@@ -16,64 +16,43 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { BASE_URL } from '../../utils/constants';
 import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
 
+const BackIcon = require('../../images/login_signup/back.png'); // Đảm bảo đường dẫn này đúng
 
-const BackIcon = require('../../images/login_signup/back.png');
-
-const UNIT_API_URL = `${BASE_URL}/units`;
+const TEST_API_URL = `${BASE_URL}/tests`;
 const LEVEL_API_URL = `${BASE_URL}/levels`;
-const UNIT_IMAGE_UPLOAD_URL = `${BASE_URL}/api/upload-unit-image`;
+const UNIT_API_URL = `${BASE_URL}/units`; // Cần để lấy danh sách units theo level
+const TEST_IMAGE_UPLOAD_URL = `${BASE_URL}/api/upload-test-image`;
 
-const UnitScreen = () => {
+const TestADScreen = () => {
     const navigation = useNavigation();
 
-    const [unitTitle, setUnitTitle] = useState('');
-    const [imageName, setImageName] = useState(null);
-    const [selectedImageUri, setSelectedImageUri] = useState(null);
-    const [units, setUnits] = useState([]);
+    const [testTitle, setTestTitle] = useState('');
+    const [testDescription, setTestDescription] = useState('');
+    const [imageName, setImageName] = useState(null); // Đường dẫn ảnh từ server (để chỉnh sửa)
+    const [selectedImageUri, setSelectedImageUri] = useState(null); // URI ảnh tạm thời từ gallery
+    const [tests, setTests] = useState([]);
     const [levels, setLevels] = useState([]);
+    const [units, setUnits] = useState([]); // Danh sách units cho picker
     const [selectedLevelId, setSelectedLevelId] = useState(null);
-    const [editingUnitId, setEditingUnitId] = useState(null);
+    const [selectedUnitId, setSelectedUnitId] = useState(null); // ID của unit được chọn
+    const [editingTestId, setEditingTestId] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isImagePicking, setIsImagePicking] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
-    const fetchUnits = useCallback(async (levelId = selectedLevelId) => {
-        if (!levelId) {
-            setUnits([]);
-            return;
-        }
-        setLoading(true);
-        setRefreshing(true); // Set refreshing true when data fetch starts
-        try {
-            const res = await fetch(`${UNIT_API_URL}/by-level/${levelId}`);
-            const data = await res.json();
-            if (res.ok) {
-                setUnits(data);
-            } else {
-                const errorMessage = data.error || 'Không thể lấy danh sách unit.';
-                Alert.alert('Lỗi', errorMessage);
-                // No need to throw here, just handle the alert
-            }
-        } catch (err) {
-            console.error('Lỗi khi lấy units:', err);
-            Alert.alert('Lỗi', 'Không thể kết nối đến server hoặc dữ liệu unit không hợp lệ.');
-        } finally {
-            setLoading(false);
-            setRefreshing(false); // Set refreshing false when data fetch ends
-        }
-    }, [selectedLevelId]);
+    // --- Fetching Data ---
 
     const fetchLevels = useCallback(async () => {
-        setLoading(true); // Keep loading true while fetching levels
+        setLoading(true);
         try {
             const res = await fetch(LEVEL_API_URL);
             const data = await res.json();
             if (res.ok) {
                 setLevels(data);
+                // Nếu chưa có cấp độ nào được chọn, chọn cấp độ đầu tiên
                 if (data.length > 0 && selectedLevelId === null) {
                     setSelectedLevelId(data[0].level_id);
                 }
@@ -85,21 +64,93 @@ const UnitScreen = () => {
             console.error('Lỗi khi lấy levels:', err);
             Alert.alert('Lỗi', 'Không thể kết nối đến server hoặc dữ liệu cấp độ không hợp lệ.');
         } finally {
-            setLoading(false); // Set loading false after levels are fetched
+            setLoading(false);
         }
-    }, [selectedLevelId]); // Dependency added to re-fetch if selectedLevelId changes unexpectedly
+    }, [selectedLevelId]);
 
+    const fetchUnitsByLevel = useCallback(async (levelId) => {
+        if (!levelId) {
+            setUnits([]);
+            setSelectedUnitId(null); // Reset unit khi không có level
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await fetch(`${UNIT_API_URL}/by-level/${levelId}`);
+            const data = await res.json();
+            if (res.ok) {
+                setUnits(data);
+                // Tự động chọn unit đầu tiên nếu có, hoặc reset nếu không có
+                if (data.length > 0) {
+                    // Chỉ đặt lại selectedUnitId nếu nó không nằm trong danh sách hiện tại
+                    if (!data.some(unit => unit.unit_id === selectedUnitId)) {
+                        setSelectedUnitId(data[0].unit_id);
+                    }
+                } else {
+                    setSelectedUnitId(null);
+                }
+            } else {
+                const errorMessage = data.error || 'Không thể lấy danh sách unit.';
+                Alert.alert('Lỗi', errorMessage);
+            }
+        } catch (err) {
+            console.error(`Lỗi khi lấy units cho level_id ${levelId}:`, err);
+            Alert.alert('Lỗi', 'Không thể kết nối đến server hoặc dữ liệu unit không hợp lệ.');
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedUnitId]);
+
+    const fetchTests = useCallback(async (levelId, unitId) => {
+        if (!levelId || !unitId) {
+            setTests([]);
+            return;
+        }
+        setLoading(true);
+        setRefreshing(true);
+        try {
+            const res = await fetch(`${TEST_API_URL}?level_id=${levelId}&unit_id=${unitId}`);
+            const data = await res.json();
+            if (res.ok) {
+                setTests(data);
+            } else {
+                const errorMessage = data.error || 'Không thể lấy danh sách bài test.';
+                Alert.alert('Lỗi', errorMessage);
+            }
+        } catch (err) {
+            console.error('Lỗi khi lấy tests:', err);
+            Alert.alert('Lỗi', 'Không thể kết nối đến server hoặc dữ liệu bài test không hợp lệ.');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    // Initial fetch for levels
     useEffect(() => {
         fetchLevels();
     }, [fetchLevels]);
 
+    // Fetch units when selectedLevelId changes
     useEffect(() => {
         if (selectedLevelId) {
-            fetchUnits(selectedLevelId);
+            fetchUnitsByLevel(selectedLevelId);
         } else {
             setUnits([]);
+            setSelectedUnitId(null);
         }
-    }, [selectedLevelId, fetchUnits]);
+    }, [selectedLevelId, fetchUnitsByLevel]);
+
+    // Fetch tests when selectedLevelId or selectedUnitId changes
+    useEffect(() => {
+        if (selectedLevelId && selectedUnitId) {
+            fetchTests(selectedLevelId, selectedUnitId);
+        } else {
+            setTests([]);
+        }
+    }, [selectedLevelId, selectedUnitId, fetchTests]);
+
+    // --- Image Handling ---
 
     const handleImagePick = async () => {
         if (isImagePicking) return;
@@ -139,10 +190,10 @@ const UnitScreen = () => {
         const fileExtension = uri.split('.').pop();
         const mimeType = `image/${fileExtension.toLowerCase()}`;
 
-        formData.append('image', {
+        formData.append('testImage', { // Tên trường phải khớp với Multer config trên server (`uploadTestImage.single('testImage')`)
             uri: uri,
             type: mimeType,
-            name: `unit_${Date.now()}.${fileExtension.toLowerCase()}`,
+            name: `test_${Date.now()}.${fileExtension.toLowerCase()}`,
         });
 
         if (oldImagePath) {
@@ -150,7 +201,7 @@ const UnitScreen = () => {
         }
 
         try {
-            const response = await fetch(UNIT_IMAGE_UPLOAD_URL, {
+            const response = await fetch(TEST_IMAGE_UPLOAD_URL, {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -159,131 +210,145 @@ const UnitScreen = () => {
             });
 
             const responseText = await response.text();
-            console.log('Phản hồi thô từ tải lên ảnh unit:', responseText);
+            console.log('Phản hồi thô từ tải lên ảnh test:', responseText);
 
             let result;
             try {
                 result = JSON.parse(responseText);
             } catch (jsonError) {
-                console.error('Lỗi phân tích JSON cho tải lên ảnh unit:', jsonError.message);
+                console.error('Lỗi phân tích JSON cho tải lên ảnh test:', jsonError.message);
                 throw new Error(`Phản hồi không hợp lệ từ server khi tải ảnh: ${responseText}`);
             }
 
             if (response.ok && result.imageUrl) {
                 return result.imageUrl;
             } else {
-                throw new Error(result.error || 'Không thể tải ảnh unit lên.');
+                throw new Error(result.error || 'Không thể tải ảnh bài test lên.');
             }
         } catch (error) {
-            console.error('Lỗi tải ảnh unit:', error);
+            console.error('Lỗi tải ảnh bài test:', error);
             Alert.alert('Lỗi', `Tải ảnh lên thất bại: ${error.message || 'Lỗi không xác định.'}`);
             throw error;
         }
     };
 
-    const handleAddUnit = async () => {
-        if (!unitTitle.trim()) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập tên unit.');
+    // --- CRUD Operations ---
+
+    const handleAddTest = async () => {
+        if (!testTitle.trim()) {
+            return Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề bài test.');
         }
         if (selectedLevelId === null) {
             return Alert.alert('Lỗi', 'Vui lòng chọn một cấp độ.');
         }
+        if (selectedUnitId === null) {
+            return Alert.alert('Lỗi', 'Vui lòng chọn một đơn vị.');
+        }
         if (!selectedImageUri) {
-            return Alert.alert('Lỗi', 'Vui lòng chọn ảnh cho unit.');
+            return Alert.alert('Lỗi', 'Vui lòng chọn ảnh cho bài test.');
         }
 
         setLoading(true);
         try {
             const uploadedImageUrl = await uploadImageToServer(selectedImageUri);
 
-            const response = await fetch(UNIT_API_URL, {
+            const response = await fetch(TEST_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: unitTitle,
+                    title: testTitle,
                     level_id: selectedLevelId,
+                    unit_id: selectedUnitId,
                     image_url: uploadedImageUrl,
+                    description: testDescription.trim() || null,
                 }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                Alert.alert('Thành công', `Đã thêm unit: ${data.title}`);
+                Alert.alert('Thành công', `Đã thêm bài test: ${data.title}`);
                 resetForm();
-                fetchUnits(selectedLevelId);
+                fetchTests(selectedLevelId, selectedUnitId);
             } else {
-                Alert.alert('Lỗi', data.error || 'Không thêm được unit.');
+                Alert.alert('Lỗi', data.error || 'Không thêm được bài test.');
             }
         } catch (err) {
-            console.error('Lỗi khi thêm unit:', err);
-            Alert.alert('Lỗi', err.message || 'Không thể thêm unit. Vui lòng thử lại.');
+            console.error('Lỗi khi thêm bài test:', err);
+            Alert.alert('Lỗi', err.message || 'Không thể thêm bài test. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
     };
 
-    const startEditingUnit = (unit) => {
-        setEditingUnitId(unit.unit_id);
-        setUnitTitle(unit.title);
-        setImageName(unit.image_url); // This holds the *old* image name/path
-        setSelectedLevelId(unit.level_id); // Set the level of the unit being edited
-        setSelectedImageUri(null); // Clear selectedImageUri to display old image
+    const startEditingTest = (test) => {
+        setEditingTestId(test.test_id);
+        setTestTitle(test.title);
+        setTestDescription(test.description || '');
+        setImageName(test.image_url); // Lưu đường dẫn ảnh cũ để xóa nếu ảnh mới được chọn
+        setSelectedLevelId(test.level_id);
+        setSelectedUnitId(test.unit_id);
+        setSelectedImageUri(null); // Clear selectedImageUri để hiển thị ảnh cũ
     };
 
-    const handleUpdateUnit = async () => {
-        if (!editingUnitId) {
-            return Alert.alert('Lỗi', 'Không có unit nào đang được chỉnh sửa.');
+    const handleUpdateTest = async () => {
+        if (!editingTestId) {
+            return Alert.alert('Lỗi', 'Không có bài test nào đang được chỉnh sửa.');
         }
-        if (!unitTitle.trim()) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập tên unit.');
+        if (!testTitle.trim()) {
+            return Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề bài test.');
         }
         if (selectedLevelId === null) {
             return Alert.alert('Lỗi', 'Vui lòng chọn một cấp độ.');
         }
-        if (!imageName && !selectedImageUri) {
-            return Alert.alert('Lỗi', 'Vui lòng chọn ảnh cho unit.');
+        if (selectedUnitId === null) {
+            return Alert.alert('Lỗi', 'Vui lòng chọn một đơn vị.');
+        }
+        if (!imageName && !selectedImageUri) { // Kiểm tra cả ảnh cũ và ảnh mới
+            return Alert.alert('Lỗi', 'Vui lòng chọn ảnh cho bài test.');
         }
 
         setLoading(true);
-        let finalImageUrl = imageName; // Default to existing image
+        let finalImageUrl = imageName; // Mặc định là ảnh hiện có
 
         try {
-            if (selectedImageUri) { // If a new image is picked
-                finalImageUrl = await uploadImageToServer(selectedImageUri, imageName); // Pass old image path to delete
+            if (selectedImageUri) { // Nếu có ảnh mới được chọn
+                finalImageUrl = await uploadImageToServer(selectedImageUri, imageName); // Tải ảnh mới và truyền ảnh cũ để xóa
             }
 
-            const response = await fetch(`${UNIT_API_URL}/${editingUnitId}`, {
+            const response = await fetch(`${TEST_API_URL}/${editingTestId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: unitTitle,
+                    title: testTitle,
                     level_id: selectedLevelId,
+                    unit_id: selectedUnitId,
                     image_url: finalImageUrl,
+                    description: testDescription.trim() || null,
                 }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                Alert.alert('Thành công', `Đã cập nhật unit: ${data.title}`);
+                Alert.alert('Thành công', `Đã cập nhật bài test: ${data.title}`);
                 resetForm();
-                fetchUnits(selectedLevelId); // Refresh units for the currently selected level
+                fetchTests(selectedLevelId, selectedUnitId); // Refresh tests for the current level and unit
             } else {
-                Alert.alert('Lỗi', data.error || 'Không cập nhật được unit.');
+                Alert.alert('Lỗi', data.error || 'Không cập nhật được bài test.');
             }
         } catch (err) {
-            console.error('Lỗi khi cập nhật unit:', err);
-            Alert.alert('Lỗi', err.message || 'Không thể cập nhật unit. Vui lòng thử lại.');
+            console.error('Lỗi khi cập nhật bài test:', err);
+            Alert.alert('Lỗi', err.message || 'Không thể cập nhật bài test. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDeleteUnit = async (unitId, imageUrl) => {
+    const handleDeleteTest = async (testId, imageUrl) => {
         Alert.alert(
             'Xác nhận xóa',
-            `Bạn có chắc chắn muốn xóa unit này? Hành động này không thể hoàn tác.`,
+            `Bạn có chắc chắn muốn xóa bài test này? Hành động này không thể hoàn tác.`,
             [
                 { text: 'Hủy', style: 'cancel' },
                 {
@@ -291,7 +356,7 @@ const UnitScreen = () => {
                     onPress: async () => {
                         setLoading(true);
                         try {
-                            const response = await fetch(`${UNIT_API_URL}/${unitId}`, {
+                            const response = await fetch(`${TEST_API_URL}/${testId}`, {
                                 method: 'DELETE',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ imageUrl: imageUrl }), // Pass image URL to delete on server
@@ -300,13 +365,13 @@ const UnitScreen = () => {
                             const data = await response.json();
 
                             if (response.ok) {
-                                Alert.alert('Thành công', `Đã xóa unit: ${data.deletedUnit.title || 'Không rõ tên'}`);
-                                fetchUnits(selectedLevelId);
+                                Alert.alert('Thành công', `Đã xóa bài test: ${data.deletedTest.title || 'Không rõ tên'}`);
+                                fetchTests(selectedLevelId, selectedUnitId);
                             } else {
-                                Alert.alert('Lỗi', data.error || 'Không xóa được unit.');
+                                Alert.alert('Lỗi', data.error || 'Không xóa được bài test.');
                             }
                         } catch (err) {
-                            console.error('Lỗi khi xóa unit:', err);
+                            console.error('Lỗi khi xóa bài test:', err);
                             Alert.alert('Lỗi', err.message || 'Không thể kết nối đến server khi xóa.');
                         } finally {
                             setLoading(false);
@@ -319,27 +384,28 @@ const UnitScreen = () => {
     };
 
     const resetForm = () => {
-        setEditingUnitId(null);
-        setUnitTitle('');
+        setEditingTestId(null);
+        setTestTitle('');
+        setTestDescription('');
         setImageName(null);
         setSelectedImageUri(null);
-        // Do NOT reset selectedLevelId here, as it's used for filtering the list
-        // and is also automatically set when selecting a level button above.
+        // Không reset selectedLevelId và selectedUnitId ở đây để giữ bộ lọc
     };
 
-    const filteredUnits = units.filter(unit =>
-        unit.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredTests = tests.filter(test =>
+        test.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const onRefresh = useCallback(() => {
-        // Reset form when refreshing to clear any half-edited state
         resetForm();
-        if (selectedLevelId) {
-            fetchUnits(selectedLevelId);
+        if (selectedLevelId && selectedUnitId) {
+            fetchTests(selectedLevelId, selectedUnitId);
+        } else if (selectedLevelId) {
+            fetchUnitsByLevel(selectedLevelId);
         } else {
-            fetchLevels(); // If no level selected, refresh levels
+            fetchLevels();
         }
-    }, [selectedLevelId, fetchUnits, fetchLevels]);
+    }, [selectedLevelId, selectedUnitId, fetchTests, fetchUnitsByLevel, fetchLevels]);
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
@@ -351,12 +417,12 @@ const UnitScreen = () => {
                 >
                     <Image source={BackIcon} style={styles.backIcon} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Quản lý (Unit)</Text>
+                <Text style={styles.headerTitle}>Quản lý (Tests)</Text>
             </View>
             {/* --- */}
 
             <ScrollView
-                contentContainerStyle={styles.scrollViewContent} // Use a separate style for ScrollView content
+                contentContainerStyle={styles.scrollViewContent}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#007bff']} tintColor={'#007bff'} />
                 }
@@ -366,7 +432,7 @@ const UnitScreen = () => {
                     <Text style={styles.label}>Chọn cấp độ để xem:</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.levelSelectorContainer}>
                         {levels.length === 0 ? (
-                            <Text style={styles.noLevelsAvailable}>Không có cấp độ nào. Vui lòng thêm cấp độ trước.</Text>
+                            <Text style={styles.noDataAvailable}>Không có cấp độ nào. Vui lòng thêm cấp độ trước.</Text>
                         ) : (
                             levels.map((lvl) => (
                                 <TouchableOpacity
@@ -376,8 +442,8 @@ const UnitScreen = () => {
                                         selectedLevelId === lvl.level_id && styles.levelButtonSelected,
                                     ]}
                                     onPress={() => {
-                                        // When selecting level here, filter unit list and reset form
                                         setSelectedLevelId(lvl.level_id);
+                                        setSelectedUnitId(null); // Reset unit khi đổi level
                                         resetForm();
                                     }}
                                 >
@@ -391,26 +457,67 @@ const UnitScreen = () => {
                     </ScrollView>
                 </View>
 
-                {/* Phần Thêm/Chỉnh sửa Unit (chỉ hiển thị khi có level được chọn) */}
+                {/* Phần Chọn đơn vị để Lọc (hiển thị khi có level được chọn) */}
                 {selectedLevelId !== null && (
                     <View style={styles.card}>
-                        <Text style={styles.label}>{editingUnitId ? 'Chỉnh sửa Units' : 'Thêm Units Mới'}</Text>
-                        <Text style={styles.label}>Tên Units</Text>
+                        <Text style={styles.label}>Chọn đơn vị để xem:</Text>
+                        {loading && !refreshing ? (
+                             <ActivityIndicator size="small" color="#007bff" style={{marginTop: 10}} />
+                        ) : (
+                            units.length === 0 ? (
+                                <Text style={styles.noDataAvailable}>Không có đơn vị nào trong cấp độ này.</Text>
+                            ) : (
+                                <View style={styles.pickerContainer}>
+                                    <Picker
+                                        selectedValue={selectedUnitId}
+                                        onValueChange={(itemValue) => {
+                                            setSelectedUnitId(itemValue);
+                                            resetForm();
+                                        }}
+                                        style={styles.picker}
+                                        itemStyle={styles.pickerItem}
+                                    >
+                                        <Picker.Item label="-- Chọn đơn vị --" value={null} />
+                                        {units.map((unit) => (
+                                            <Picker.Item key={unit.unit_id} label={unit.title} value={unit.unit_id} />
+                                        ))}
+                                    </Picker>
+                                </View>
+                            )
+                        )}
+                    </View>
+                )}
+
+                {/* Phần Thêm/Chỉnh sửa Test (chỉ hiển thị khi có level và unit được chọn) */}
+                {selectedLevelId !== null && selectedUnitId !== null && (
+                    <View style={styles.card}>
+                        <Text style={styles.label}>{editingTestId ? 'Chỉnh sửa Bài Test' : 'Thêm Bài Test Mới'}</Text>
+                        
+                        <Text style={styles.label}>Tiêu đề Bài Test</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="VD: Unit 1, Unit 2..."
-                            value={unitTitle}
-                            onChangeText={setUnitTitle}
+                            placeholder="VD: Bài kiểm tra Unit 1..."
+                            value={testTitle}
+                            onChangeText={setTestTitle}
                         />
 
-                        {/* Level Picker for Add/Edit Form */}
-                        <Text style={styles.label}>Cấp độ cho Units</Text>
+                        <Text style={styles.label}>Mô tả Bài Test (Tùy chọn)</Text>
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                            placeholder="Mô tả chi tiết bài test..."
+                            value={testDescription}
+                            onChangeText={setTestDescription}
+                            multiline
+                        />
+
+                        <Text style={styles.label}>Cấp độ cho Bài Test</Text>
                         <View style={styles.pickerContainer}>
                             <Picker
                                 selectedValue={selectedLevelId}
                                 onValueChange={(itemValue) => setSelectedLevelId(itemValue)}
                                 style={styles.picker}
                                 itemStyle={styles.pickerItem}
+                                enabled={true} // Luôn cho phép chọn level
                             >
                                 {levels.length === 0 ? (
                                     <Picker.Item label="Không có cấp độ" value={null} />
@@ -422,7 +529,26 @@ const UnitScreen = () => {
                             </Picker>
                         </View>
 
-                        <Text style={styles.label}>Ảnh Units</Text>
+                        <Text style={styles.label}>Đơn vị cho Bài Test</Text>
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={selectedUnitId}
+                                onValueChange={(itemValue) => setSelectedUnitId(itemValue)}
+                                style={styles.picker}
+                                itemStyle={styles.pickerItem}
+                                enabled={true} // Luôn cho phép chọn unit
+                            >
+                                {units.length === 0 ? (
+                                    <Picker.Item label="Không có đơn vị" value={null} />
+                                ) : (
+                                    units.map((unit) => (
+                                        <Picker.Item key={unit.unit_id} label={unit.title} value={unit.unit_id} />
+                                    ))
+                                )}
+                            </Picker>
+                        </View>
+
+                        <Text style={styles.label}>Ảnh Bài Test</Text>
                         <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePick} disabled={isImagePicking}>
                             <Text style={styles.imagePickerButtonText}>
                                 {isImagePicking ? 'Đang chọn ảnh...' : 'Chọn ảnh từ thư viện'}
@@ -438,20 +564,20 @@ const UnitScreen = () => {
                             <Text style={styles.noImageText}>Chưa có ảnh nào được chọn.</Text>
                         )}
 
-                        {loading ? (
+                        {loading && !refreshing ? (
                             <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 20 }} />
                         ) : (
                             <>
-                                {editingUnitId ? (
-                                    <TouchableOpacity style={[styles.button, styles.updateButton]} onPress={handleUpdateUnit}>
-                                        <Text style={styles.buttonText}>Cập nhật Units</Text>
+                                {editingTestId ? (
+                                    <TouchableOpacity style={[styles.button, styles.updateButton]} onPress={handleUpdateTest}>
+                                        <Text style={styles.buttonText}>Cập nhật Bài Test</Text>
                                     </TouchableOpacity>
                                 ) : (
-                                    <TouchableOpacity style={styles.button} onPress={handleAddUnit}>
-                                        <Text style={styles.buttonText}>Thêm </Text>
+                                    <TouchableOpacity style={styles.button} onPress={handleAddTest}>
+                                        <Text style={styles.buttonText}>Thêm Bài Test</Text>
                                     </TouchableOpacity>
                                 )}
-                                {(editingUnitId || unitTitle || selectedImageUri || selectedLevelId !== null) && (
+                                {(editingTestId || testTitle || testDescription || selectedImageUri || selectedLevelId !== null || selectedUnitId !== null) && (
                                     <TouchableOpacity
                                         style={[styles.button, styles.cancelButton]}
                                         onPress={resetForm}
@@ -465,51 +591,54 @@ const UnitScreen = () => {
                 )}
                 {/* --- */}
 
-                {/* Thanh tìm kiếm và Danh sách Unit */}
-                {selectedLevelId !== null ? (
+                {/* Thanh tìm kiếm và Danh sách Test */}
+                {selectedLevelId !== null && selectedUnitId !== null ? (
                     <>
-                        <Text style={[styles.headerTitle, { fontSize: 22, marginTop: 30, marginBottom: 15, textAlign: 'center' }]}>Danh sách Units</Text>
+                        <Text style={[styles.headerTitle, { fontSize: 22, marginTop: 30, marginBottom: 15, textAlign: 'center' }]}>Danh sách Bài Test</Text>
                         <TextInput
                             style={styles.searchInput}
-                            placeholder="Tìm kiếm đơn vị..."
+                            placeholder="Tìm kiếm bài test..."
                             value={searchTerm}
                             onChangeText={setSearchTerm}
                         />
 
-                        {loading && !refreshing ? ( // Only show loading spinner if not refreshing
+                        {loading && !refreshing ? (
                             <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 20 }} />
                         ) : (
-                            filteredUnits.length === 0 ? (
-                                <Text style={styles.noUnitsText}>
-                                    {searchTerm ? `Không tìm thấy đơn vị "${searchTerm}" trong cấp độ này.` : 'Chưa có đơn vị nào trong cấp độ này.'}
+                            filteredTests.length === 0 ? (
+                                <Text style={styles.noDataAvailable}>
+                                    {searchTerm ? `Không tìm thấy bài test "${searchTerm}" trong đơn vị này.` : 'Chưa có bài test nào trong đơn vị này.'}
                                 </Text>
                             ) : (
-                                filteredUnits.map((unit, index) => (
-                                    <View key={unit.unit_id} style={styles.unitCard}>
-                                        <Text style={styles.unitText}>
-                                            {index + 1}. {unit.title}
+                                filteredTests.map((test, index) => (
+                                    <View key={test.test_id} style={styles.testCard}>
+                                        <Text style={styles.testText}>
+                                            {index + 1}. {test.title} (Lượt chơi: {test.play_count})
                                         </Text>
+                                        {test.description ? (
+                                            <Text style={styles.testDescription}>{test.description}</Text>
+                                        ) : null}
 
-                                        {unit.image_url ? (
+                                        {test.image_url ? (
                                             <Image
-                                                source={{ uri: `${BASE_URL}${unit.image_url}` }}
-                                                style={styles.unitImage}
+                                                source={{ uri: `${BASE_URL}${test.image_url}` }}
+                                                style={styles.testImage}
                                             />
                                         ) : (
                                             <Text style={styles.noImagePlaceholder}>Không có ảnh</Text>
                                         )}
 
-                                        <View style={styles.unitActions}>
+                                        <View style={styles.testActions}>
                                             <TouchableOpacity
                                                 style={[styles.actionButton, { backgroundColor: '#f0ad4e' }]}
-                                                onPress={() => startEditingUnit(unit)}
+                                                onPress={() => startEditingTest(test)}
                                             >
                                                 <Text style={styles.actionButtonText}>✏️ Sửa</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity
                                                 style={[styles.actionButton, { backgroundColor: '#d9534f' }]}
-                                                onPress={() => handleDeleteUnit(unit.unit_id, unit.image_url)}
+                                                onPress={() => handleDeleteTest(test.test_id, test.image_url)}
                                             >
                                                 <Text style={styles.actionButtonText}>🗑️ Xóa</Text>
                                             </TouchableOpacity>
@@ -520,7 +649,7 @@ const UnitScreen = () => {
                         )}
                     </>
                 ) : (
-                    <Text style={styles.selectLevelPrompt}>Vui lòng chọn một cấp độ để xem.</Text>
+                    <Text style={styles.selectPrompt}>Vui lòng chọn một cấp độ và một đơn vị để xem hoặc thêm bài test.</Text>
                 )}
             </ScrollView>
         </SafeAreaView>
@@ -529,24 +658,24 @@ const UnitScreen = () => {
 
 const styles = StyleSheet.create({
     scrollViewContent: {
-        paddingHorizontal: 20, // Apply padding to the scroll view content
+        paddingHorizontal: 20,
         paddingBottom: 50,
         backgroundColor: '#E0E5FF',
     },
     headerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', // Center the title
+        justifyContent: 'center',
         paddingVertical: 15,
-        paddingHorizontal: 20, // Added for consistency with LevelScreen example
+        paddingHorizontal: 20,
         marginTop: 20,
         backgroundColor: '#f8f9fa',
-        borderBottomWidth: 1, // Added for consistency with LevelScreen example
-        borderBottomColor: '#e0e0e0', // Added for consistency with LevelScreen example
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
     },
     backButton: {
-        position: 'absolute', // Keep absolute to position independently within the row
-        left: 20, // Adjust left to match paddingHorizontal of headerContainer
+        position: 'absolute',
+        left: 20,
         padding: 5,
         zIndex: 10,
     },
@@ -555,13 +684,12 @@ const styles = StyleSheet.create({
         height: 24,
         tintColor: '#343a40',
     },
-    // Renamed from 'header' to 'headerTitle' for clarity and to avoid conflict with other 'header' uses
     headerTitle: {
         fontSize: 26,
         fontWeight: 'bold',
         color: '#343a40',
         textAlign: 'center',
-        flex: 1, // Allow title to take up space and center
+        flex: 1,
     },
     card: {
         backgroundColor: '#ffffff',
@@ -589,6 +717,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginTop: 5,
         marginBottom: 10,
+        backgroundColor: '#fff',
     },
     imagePickerButton: {
         backgroundColor: '#6c757d',
@@ -671,14 +800,14 @@ const styles = StyleSheet.create({
     levelButtonTextSelected: {
         color: '#ffffff',
     },
-    noLevelsAvailable: {
+    noDataAvailable: {
         color: '#dc3545',
         textAlign: 'center',
         marginVertical: 10,
         fontStyle: 'italic',
         paddingHorizontal: 20,
     },
-    unitCard: {
+    testCard: {
         backgroundColor: '#fff',
         marginVertical: 10,
         padding: 15,
@@ -689,13 +818,19 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    unitText: {
+    testText: {
         fontSize: 18,
         fontWeight: '600',
         color: '#212529',
-        marginBottom: 10,
+        marginBottom: 5,
     },
-    unitImage: {
+    testDescription: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 10,
+        lineHeight: 20,
+    },
+    testImage: {
         width: '100%',
         height: 160,
         resizeMode: 'cover',
@@ -708,7 +843,7 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         marginBottom: 10,
     },
-    unitActions: {
+    testActions: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
@@ -724,13 +859,7 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: 'bold',
     },
-    noUnitsText: {
-        textAlign: 'center',
-        marginTop: 20,
-        fontSize: 16,
-        color: '#666',
-    },
-    selectLevelPrompt: {
+    selectPrompt: {
         textAlign: 'center',
         marginTop: 40,
         fontSize: 18,
@@ -770,4 +899,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default UnitScreen;
+export default TestADScreen;

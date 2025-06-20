@@ -157,9 +157,6 @@ const HistoryScreen = () => {
             />
             <View style={styles.headerWrapper}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
-                    </TouchableOpacity>
                     <Text style={styles.headerTitle}>Lịch sử bài làm</Text>
                     <View style={{ width: 30 }} />
                 </View>
@@ -210,7 +207,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#E0E5FF', // Light blue background for the entire screen below header
     },
-    headerWrapper: { // New View to ensure white background behind status bar and header
+    /*headerWrapper: { // New View to ensure white background behind status bar and header
         backgroundColor: 'white', // This will cover the status bar area
         // Add padding for Android's status bar height to prevent content overlap
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, 
@@ -220,31 +217,20 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         zIndex: 1, // Ensure header is above other content
-    },
+    },*/
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingBottom: 15,
-        backgroundColor: '#FFFFFF', // Header background color
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    backButton: {
-        padding: 5,
-    },
-    backIcon: {
-        width: 24,
-        height: 24,
-        tintColor: '#333',
-    },
-    headerTitle: {
-        flex: 1,
-        textAlign: 'center',
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-    },
+    paddingTop: 50,
+    paddingBottom: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
     scrollViewContent: {
         flexGrow: 1,
         padding: 20,

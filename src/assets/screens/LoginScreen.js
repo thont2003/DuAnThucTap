@@ -205,14 +205,14 @@ useEffect(() => {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.loginTitle}>Login</Text>
+          <Text style={styles.loginTitle}>Đăng Nhập</Text>
 
-          <Text style={styles.inputLabel}>Email address</Text>
+          <Text style={styles.inputLabel}>Email</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={emailRef}
               style={styles.input}
-              placeholder="Your email address"
+              placeholder="Nhập email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -224,12 +224,12 @@ useEffect(() => {
             />
           </View>
 
-          <Text style={styles.inputLabel}>Password</Text>
+          <Text style={styles.inputLabel}>Mặt khẩu</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={passwordRef}
               style={styles.input}
-              placeholder="Your password"
+              placeholder="Nhập mật khẩu"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -257,7 +257,7 @@ useEffect(() => {
               ) : (
                 <Image source={require('../images/login_signup/uncheckbox.png')} style={styles.checkboxIcon} />
               )}
-              <Text style={styles.rememberMeText}>Remember me</Text>
+              <Text style={styles.rememberMeText}>Nhớ tài khoản</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
               <Text style={styles.forgotPasswordText}>Forgot password?</Text>
@@ -265,13 +265,13 @@ useEffect(() => {
           </View>
 
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Login</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Đăng nhập</Text>}
           </TouchableOpacity>
 
           <View style={styles.signUpContainer}>
-            <Text style={styles.dontHaveAccountText}>Don't have an account? </Text>
+            <Text style={styles.dontHaveAccountText}>Bạn chưa có tài khoản? </Text>
             <TouchableOpacity onPress={() => navigation.replace('Register')}>
-              <Text style={styles.signupText}>Signup</Text>
+              <Text style={styles.signupText}>Đăng ký ngay</Text>
             </TouchableOpacity>
           </View>
         </View>

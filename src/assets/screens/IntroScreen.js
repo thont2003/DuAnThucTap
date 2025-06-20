@@ -34,14 +34,14 @@ const IntroScreen = () => {
                     style={styles.loginButton}
                     onPress={() => navigation.navigate('Login')}
                 >
-                    <Text style={styles.loginButtonText}>Login</Text>
+                    <Text style={styles.loginButtonText}>Đăng Nhập</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.signupButton}
                     onPress={() => navigation.navigate('Register')}
                 >
-                    <Text style={styles.signupButtonText}>SignUp</Text>
+                    <Text style={styles.signupButtonText}>Đăng Ký</Text>
                 </TouchableOpacity>
             </View>
 

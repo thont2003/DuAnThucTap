@@ -51,7 +51,7 @@ const QuestionsScreen = () => {
         if (imageFileName.startsWith('http://') || imageFileName.startsWith('https://')) {
             return imageFileName;
         }
-        return `${BASE_URL}/images/${imageFileName}`;
+        return `${BASE_URL}${imageFileName}`;
     };
 
     const getFullAudioUrl = (audioFileName) => {

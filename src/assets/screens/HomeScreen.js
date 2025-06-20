@@ -257,7 +257,7 @@ const HomeScreen = ({ route }) => {
                 </View>
             </View>
 
-            <Text style={homeStyles.categoriesTitle}>Categories</Text>
+            <Text style={homeStyles.categoriesTitle}>Danh mục</Text>
 
             {loading ? (
                 <View style={homeStyles.loadingContainer}>
