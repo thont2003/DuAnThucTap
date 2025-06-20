@@ -42,48 +42,62 @@ const ChangePasswordScreen = () => {
     return lengthValid && hasLower && hasUpper && hasDigit;
   };
 
-  const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      showAlert('Lỗi', 'Vui lòng nhập đủ đổi mật khẩu.');
-      return;
+const handleChangePassword = async () => {
+  if (!oldPassword || !newPassword || !confirmPassword) {
+    showAlert('Lỗi', 'Vui lòng nhập đủ đổi mật khẩu.');
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showAlert('Lỗi', 'Xác nhận mật khẩu không khớp.');
+    return;
+  }
+
+  if (!validatePassword(newPassword)) {
+    showAlert('Lỗi', 'Mật khẩu mới không đáp ứng yêu cầu bảo mật.');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const userInfo = JSON.parse(await AsyncStorage.getItem('userInfo'));
+    const userId = userInfo?.userId;
+    if (!userId) throw new Error('Thiếu userId');
+
+    const response = await apiCall('PUT', `/api/user/${userId}/change-password`, {
+      oldPassword,
+      newPassword,
+    });
+
+    if (response.ok) {
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+      setAlertTitle('Thành công');
+      setAlertMessage('Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.');
+      setIsAlertVisible(true);
+
+      setTimeout(async () => {
+        await AsyncStorage.removeItem('userInfo');
+        await AsyncStorage.removeItem('rememberedEmail');
+        await AsyncStorage.removeItem('rememberedPassword');
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }, 1000);
+    } else {
+      showAlert('Lỗi', response.data?.error || 'Không thay đổi được mật khẩu.');
     }
-
-    if (newPassword !== confirmPassword) {
-      showAlert('Lỗi', 'Xác nhận mật khẩu không khớp.');
-      return;
-    }
-
-    if (!validatePassword(newPassword)) {
-      showAlert('Lỗi', 'Mật khẩu mới không đáp ứng yêu cầu bảo mật.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const userInfo = JSON.parse(await AsyncStorage.getItem('userInfo'));
-      const userId = userInfo?.userId;
-      if (!userId) throw new Error('Thiếu userId');
-
-      const response = await apiCall('PUT', `/api/user/${userId}/change-password`, {
-        oldPassword,
-        newPassword,
-      });
-
-      if (response.ok) {
-        showAlert('Thành công', 'Mật khẩu đã được thay đổi.');
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        showAlert('Lỗi', response.data?.error || 'Không thay đổi được mật khẩu.');
-      }
-    } catch (err) {
-      console.error(err);
-      showAlert('Lỗi', 'Không kết nối được với server.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    showAlert('Lỗi', 'Không kết nối được với server.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={styles.container}>

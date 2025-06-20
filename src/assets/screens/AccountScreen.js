@@ -51,11 +51,6 @@ const AccountScreen = () => {
   }
 };
 
-
-  const handlePressOtherOption = (optionName) => {
-    console.log(`Pressed: ${optionName}`);
-  };
-
   const confirmLogout = async () => {
     setLogoutAlertVisible(false);
     try {
@@ -64,7 +59,7 @@ const AccountScreen = () => {
       console.log('Đã xóa thông tin đăng nhập khỏi AsyncStorage.');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'IntroScreen' }],
+        routes: [{ name: 'Login' }],
       });
       // Có thể thêm thông báo toast hoặc snackbar thay vì Alert.alert() mặc định
       // Ví dụ: ToastAndroid.show('Bạn đã đăng xuất thành công!', ToastAndroid.SHORT);

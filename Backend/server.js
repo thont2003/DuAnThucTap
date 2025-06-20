@@ -5,6 +5,8 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
+require('dotenv').config(); // Tải biến môi trường từ .env
 
 const app = express();
 app.use(cors());
@@ -109,10 +111,6 @@ const uploadUnitImage = multer({
 });
 
 
-
-
-
-
 // Cung cấp các file tĩnh khác
 app.use('/audio', express.static('public/audio'));
 app.use('/images', express.static('public/images'));
@@ -121,7 +119,7 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // Cấu hình kết nối PostgreSQL
 const pool = new Pool({
     user: 'postgres',
-    host: '192.168.1.25', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+    host: '192.168.1.53', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
     database: 'english',
     password: '123',
     port: 5432,
@@ -225,6 +223,58 @@ app.post('/login', async (req, res) => {
     } catch (error) {
         console.error('Error during login:', error);
         res.status(500).json({ error: 'Lỗi server.' });
+    }
+});
+
+// Thêm route Quên mật khẩu và gửi email thật
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Vui lòng nhập địa chỉ email.' });
+    }
+
+    try {
+        const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Email không tồn tại trong hệ thống.' });
+        }
+
+        // Tạo mật khẩu mới ngẫu nhiên
+        const newPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Cập nhật mật khẩu mới trong DB
+        await pool.query('UPDATE users SET password = $1 WHERE email = $2', [hashedPassword, email]);
+
+        // Gửi email với mật khẩu mới
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: `"English App Support" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: '🔐 Mật khẩu mới cho tài khoản English App',
+            html: `
+                <h3>Chào bạn,</h3>
+                <p>Mật khẩu mới của bạn là: <strong>${newPassword}</strong></p>
+                <p>Vui lòng đăng nhập và thay đổi mật khẩu ngay sau đó.</p>
+                <p>Trân trọng,<br/>Đội ngũ hỗ trợ English App</p>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        return res.status(200).json({ message: 'Mật khẩu mới đã được gửi đến email của bạn.' });
+    } catch (err) {
+        console.error('Lỗi khi gửi lại mật khẩu:', err);
+        return res.status(500).json({ error: 'Lỗi server khi đặt lại mật khẩu.' });
     }
 });
 
