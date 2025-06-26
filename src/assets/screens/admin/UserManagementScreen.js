@@ -12,10 +12,9 @@ import {
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
+import { BASE_URL } from '../../utils/constants';
 
 const BackIcon = require('../../images/login_signup/back.png');
-
-const API = 'http://192.168.1.53:3000';
 
 const UserManagementScreen = () => {
   const [users, setUsers] = useState([]);
@@ -24,7 +23,7 @@ const UserManagementScreen = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(`${API}/api/users`);
+      const res = await axios.get(`${BASE_URL}/api/users`);
       setUsers(res.data);
     } catch (err) {
       console.error('Lỗi khi tải danh sách người dùng:', err);
@@ -47,7 +46,7 @@ const UserManagementScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await axios.delete(`${API}/api/users/${userId}`);
+              await axios.delete(`${BASE_URL}/api/users/${userId}`);
               fetchUsers();
               Alert.alert('Thành công', 'Người dùng đã được xoá.');
             } catch (err) {
@@ -76,7 +75,7 @@ const UserManagementScreen = () => {
     }
 
     try {
-      await axios.put(`${API}/api/users/${userId}/role`, {
+      await axios.put(`${BASE_URL}/api/users/${userId}/role`, {
         role: newRole,
       });
       fetchUsers();

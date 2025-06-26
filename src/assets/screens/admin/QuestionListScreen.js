@@ -6,14 +6,13 @@ import {
 import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
+import { BASE_URL } from '../../utils/constants';
 
 // Import your back icon (ensure this path is correct relative to this file)
 // Giả định đường dẫn này là đúng, ví dụ: nằm ở cùng cấp với components hoặc trong thư mục assets
 const BackIcon = require('../../images/login_signup/back.png'); // Điều chỉnh đường dẫn nếu cần
 
-const API = 'http://192.168.1.53:3000'; // THAY THẾ BẰNG IP VÀ PORT CỦA SERVER BACKEND CỦA BẠN
-
-const QUESTION_IMAGE_UPLOAD_URL = `${API}/api/upload-question-image`;
+const QUESTION_IMAGE_UPLOAD_URL = `${BASE_URL}/api/upload-question-image`;
 
 const QuestionListScreen = ({ route }) => {
     const navigation = useNavigation(); // Initialize navigation

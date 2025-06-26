@@ -84,7 +84,7 @@ const AccountScreen = () => {
             source={
               userInfo.profileImageUrl
                 ? { uri: `${BASE_URL}${userInfo.profileImageUrl}` }
-                : require('../images/profile/avatar.png')
+                : require('../images/profile/user.png')
             }
             style={styles.profileIcon}
           />
