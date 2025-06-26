@@ -301,9 +301,9 @@ const ResultScreen = () => {
 
             <TouchableOpacity
                 style={styles.backToTestsButton}
-                onPress={() => navigation.pop(2)}
+                onPress={() => navigation.navigate('MainTabs')}
             >
-                <Text style={styles.backToTestsButtonText}>Quay lại danh sách bài tập</Text>
+                <Text style={styles.backToTestsButtonText}>Quay lại trang chủ</Text>
             </TouchableOpacity>
         </View>
     );

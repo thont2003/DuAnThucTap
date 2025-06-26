@@ -11,6 +11,7 @@ import {
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import TouchableScale from 'react-native-touchable-scale';
+import { BASE_URL } from '../../utils/constants';
 
 // Import your back icon image
 // Make sure you have an image file at this path, e.g., 'back.png' in an 'assets' folder
@@ -22,7 +23,7 @@ const QuestionTypeListScreen = () => {
 
     useEffect(() => {
         axios
-            .get('http://192.168.1.53:3000/questiontypes')
+            .get(`${BASE_URL}/questiontypes`)
             .then((res) => setTypes(res.data))
             .catch((err) => console.error('Lỗi khi lấy loại câu hỏi:', err));
     }, []);

@@ -224,7 +224,7 @@ useEffect(() => {
             />
           </View>
 
-          <Text style={styles.inputLabel}>Mặt khẩu</Text>
+          <Text style={styles.inputLabel}>Mật khẩu</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               ref={passwordRef}
@@ -260,7 +260,7 @@ useEffect(() => {
               <Text style={styles.rememberMeText}>Nhớ tài khoản</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
-              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
           </View>
 

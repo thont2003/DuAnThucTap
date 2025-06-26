@@ -247,8 +247,8 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // Cấu hình kết nối PostgreSQL
 const pool = new Pool({
     user: 'postgres',
-    host: '192.168.1.53', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
-    database: 'english',
+    host: '192.168.1.3', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+    database: 'mmm',
     password: '123',
     port: 5432,
 });

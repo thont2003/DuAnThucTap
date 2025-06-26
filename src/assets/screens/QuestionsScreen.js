@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     ScrollView,
-    Alert, // Import Alert for the confirmation dialog
     Dimensions,
     TextInput,
     Platform,
@@ -17,9 +16,8 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { apiCall } from '../utils/api';
 import { BASE_URL } from '../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Import Sound library
 import Sound from 'react-native-sound';
+import CustomAlertDialog from '../components/CustomAlertDialog';
 
 Sound.setCategory('Playback');
 
@@ -39,12 +37,40 @@ const QuestionsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [userAnswersHistory, setUserAnswersHistory] = useState([]);
-
-    // State for audio
     const [isPlayingAudio, setIsPlayingAudio] = useState(false);
     const soundRef = useRef(null);
-
     const scrollViewRef = useRef(null);
+
+    // State for CustomAlertDialog
+    const [dialogVisible, setDialogVisible] = useState(false);
+    const [dialogConfig, setDialogConfig] = useState({
+        title: '',
+        message: '',
+        confirmText: 'OK',
+        cancelText: 'Hủy',
+        onConfirm: () => {},
+        onCancel: null,
+        showCancelButton: false,
+    });
+
+    const showCustomAlert = (title, message, confirmText = 'OK', onConfirm = () => {}, cancelText = 'Hủy', onCancel = null, showCancelButton = true) => {
+        setDialogConfig({
+            title,
+            message,
+            confirmText,
+            cancelText,
+            onConfirm: () => {
+                onConfirm();
+                setDialogVisible(false);
+            },
+            onCancel: onCancel ? () => {
+                onCancel();
+                setDialogVisible(false);
+            } : null,
+            showCancelButton,
+        });
+        setDialogVisible(true);
+    };
 
     const getFullImageUrl = (imageFileName) => {
         if (!imageFileName) return '';
@@ -90,7 +116,7 @@ const QuestionsScreen = () => {
         soundRef.current = new Sound(audioUrl, null, (error) => {
             if (error) {
                 console.error('Failed to load the sound:', error);
-                Alert.alert('Lỗi tải âm thanh', 'Không thể tải tệp âm thanh. Vui lòng thử lại.');
+                showCustomAlert('Lỗi tải âm thanh', 'Không thể tải tệp âm thanh. Vui lòng thử lại.', 'OK', () => {}, null, null, false);
                 stopAndReleaseSound();
                 return;
             }
@@ -101,7 +127,7 @@ const QuestionsScreen = () => {
                     console.log('Successfully finished playing!');
                 } else {
                     console.error('Playback failed due to audio decoding errors.');
-                    Alert.alert('Lỗi phát âm thanh', 'Không thể phát tệp âm thanh.');
+                    showCustomAlert('Lỗi phát âm thanh', 'Không thể phát tệp âm thanh.', 'OK', () => {}, null, null, false);
                 }
                 setIsPlayingAudio(false);
                 stopAndReleaseSound();
@@ -117,7 +143,7 @@ const QuestionsScreen = () => {
             if (currentQuestion && currentQuestion.audio_path) {
                 playAudio(currentQuestion.audio_path);
             } else {
-                Alert.alert('Thông báo', 'Không có âm thanh cho câu hỏi này.');
+                showCustomAlert('Thông báo', 'Không có âm thanh cho câu hỏi này.', 'OK', () => {}, null, null, false);
             }
         }
     };
@@ -133,13 +159,13 @@ const QuestionsScreen = () => {
                 const shuffledQuestionsOrder = response.data.sort(() => Math.random() - 0.5);
 
                 const shuffledQuestions = shuffledQuestionsOrder.map(q => {
-                    if (q.type_id === 1) { // Only shuffle answers for multiple-choice questions
+                    if (q.type_id === 1) {
                         return {
                             ...q,
                             answers: q.answers.sort(() => Math.random() - 0.5)
                         };
                     }
-                    return q; // Don't shuffle answers for type_id 2
+                    return q;
                 });
                 setQuestions(shuffledQuestions);
                 setCurrentQuestionIndex(0);
@@ -152,13 +178,13 @@ const QuestionsScreen = () => {
             } else {
                 const message = response.data?.error || response.data?.message || 'Không thể tải câu hỏi.';
                 setError(message);
-                Alert.alert('Lỗi', message);
+                showCustomAlert('Lỗi', message, 'OK', () => {}, null, null, false);
                 console.error('QuestionsScreen: Lỗi từ server khi fetch questions:', response.status, response.data);
             }
         } catch (err) {
             console.error('QuestionsScreen: Lỗi khi fetch questions:', err);
             setError('Không thể kết nối đến server để tải câu hỏi.');
-            Alert.alert('Lỗi', 'Không thể kết nối đến server để tải câu hỏi.');
+            showCustomAlert('Lỗi', 'Không thể kết nối đến server để tải câu hỏi.', 'OK', () => {}, null, null, false);
         } finally {
             setLoading(false);
         }
@@ -196,10 +222,10 @@ const QuestionsScreen = () => {
             );
 
             if (historyEntry) {
-                if (questions[currentQuestionIndex]?.type_id === 1) { // Multiple Choice
+                if (questions[currentQuestionIndex]?.type_id === 1) {
                     setSelectedAnswerId(historyEntry.selectedAnswerId);
                     setUserTextInput('');
-                } else if (questions[currentQuestionIndex]?.type_id === 2) { // Fill-in-the-blank
+                } else if (questions[currentQuestionIndex]?.type_id === 2) {
                     setUserTextInput(historyEntry.answerText || '');
                     setSelectedAnswerId(null);
                 }
@@ -212,33 +238,25 @@ const QuestionsScreen = () => {
         }
     }, [currentQuestionIndex, questions, userAnswersHistory]);
 
-    // Add navigation listener to prompt before leaving
     useEffect(() => {
         const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-            // Prevent default behavior of leaving the screen
             e.preventDefault();
-
-            // Prompt the user before leaving the screen
-            Alert.alert(
+            showCustomAlert(
                 'Thoát khỏi bài làm?',
                 'Bạn có chắc muốn thoát khỏi bài làm không? Tiến độ hiện tại sẽ không được lưu.',
-                [
-                    { text: 'Không', style: 'cancel', onPress: () => {} },
-                    {
-                        text: 'Có',
-                        style: 'destructive',
-                        onPress: () => {
-                            stopAndReleaseSound(); // Stop audio if exiting
-                            navigation.dispatch(e.data.action); // Allow the navigation to proceed
-                        },
-                    },
-                ]
+                'Có',
+                () => {
+                    stopAndReleaseSound();
+                    navigation.dispatch(e.data.action);
+                },
+                'Không',
+                () => {},
+                true
             );
         });
 
         return unsubscribe;
     }, [navigation, stopAndReleaseSound]);
-
 
     const handleAnswerPress = (answer) => {
         setSelectedAnswerId(answer.answer_id);
@@ -257,16 +275,16 @@ const QuestionsScreen = () => {
         let finalSelectedAnswerId = null;
         let finalUserTextInput = '';
 
-        if (currentQuestion.type_id === 1) { // Multiple Choice
+        if (currentQuestion.type_id === 1) {
             canProceed = selectedAnswerId !== null;
             finalSelectedAnswerId = selectedAnswerId;
-        } else if (currentQuestion.type_id === 2) { // Fill-in-the-blank
+        } else if (currentQuestion.type_id === 2) {
             canProceed = userTextInput.trim() !== '';
             finalUserTextInput = userTextInput.trim();
         }
 
         if (!canProceed) {
-            Alert.alert('Chưa hoàn thành', 'Vui lòng hoàn thành câu trả lời trước khi chuyển câu hỏi.');
+            showCustomAlert('Chưa hoàn thành', 'Vui lòng hoàn thành câu trả lời trước khi chuyển câu hỏi.', 'OK', () => {}, null, null, false);
             return;
         }
 
@@ -278,7 +296,6 @@ const QuestionsScreen = () => {
             isCorrect = currentQuestion.correct_answer.trim().toLowerCase() === finalUserTextInput.toLowerCase();
         }
 
-        // Prepare the new entry for the current question
         const newCurrentQuestionAnswerEntry = {
             questionId: currentQuestion.question_id,
             selectedAnswerId: finalSelectedAnswerId,
@@ -288,28 +305,23 @@ const QuestionsScreen = () => {
             correctAnswerContent: currentQuestion.type_id === 2 ? currentQuestion.correct_answer : null,
         };
 
-        // Determine the final user answers history to be used for submission
         let finalUserAnswersForSubmission;
         const existingIndexInHistory = userAnswersHistory.findIndex(item => item.questionId === currentQuestion.question_id);
 
         if (existingIndexInHistory > -1) {
-            // If the current question's answer already exists in history, update it
             finalUserAnswersForSubmission = [...userAnswersHistory];
             finalUserAnswersForSubmission[existingIndexInHistory] = newCurrentQuestionAnswerEntry;
         } else {
-            // Otherwise, add it to the history
             finalUserAnswersForSubmission = [...userAnswersHistory, newCurrentQuestionAnswerEntry];
         }
 
-        // Update the userAnswersHistory state (this will trigger a re-render later, but not immediately for score calculation)
         setUserAnswersHistory(finalUserAnswersForSubmission);
 
         stopAndReleaseSound();
 
         if (currentQuestionIndex === questions.length - 1) {
-            // For the last question, use the immediately prepared finalUserAnswersForSubmission
             const finalCorrectCount = finalUserAnswersForSubmission.filter(item => item.isCorrect).length;
-            await finishTest(finalCorrectCount, finalUserAnswersForSubmission); // Pass final answers to finishTest
+            await finishTest(finalCorrectCount, finalUserAnswersForSubmission);
         } else {
             setCurrentQuestionIndex(prev => prev + 1);
             setSelectedAnswerId(null);
@@ -327,7 +339,6 @@ const QuestionsScreen = () => {
         }
     };
 
-    // Modified finishTest to accept userAnswersHistory directly
     const finishTest = async (finalCorrectAnswersCount, submittedUserAnswers) => {
         setLoading(true);
         let userId = null;
@@ -344,30 +355,21 @@ const QuestionsScreen = () => {
             }
 
             if (!userId) {
-                Alert.alert(
+                showCustomAlert(
                     'Lỗi thông tin người dùng',
                     'Không tìm thấy thông tin người dùng. Vui lòng đảm bảo bạn đã đăng nhập và thử lại. Nếu vấn đề tiếp diễn, hãy liên hệ hỗ trợ.',
-                    [
-                        {
-                            text: 'Đăng nhập lại',
-                            onPress: () => navigation.replace('Login')
-                        },
-                        {
-                            text: 'Hủy',
-                            style: 'cancel',
-                            onPress: () => {
-                                setLoading(false);
-                            }
-                        }
-                    ]
+                    'Đăng nhập lại',
+                    () => navigation.replace('Login'),
+                    'Hủy',
+                    () => setLoading(false),
+                    true
                 );
                 return;
             }
 
             const userIdInt = parseInt(userId, 10);
             if (isNaN(userIdInt)) {
-                Alert.alert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.');
-                navigation.replace('Login');
+                showCustomAlert('Lỗi', 'Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.', 'OK', () => navigation.replace('Login'), null, null, false);
                 return;
             }
 
@@ -380,7 +382,7 @@ const QuestionsScreen = () => {
                 score: totalScore,
                 totalQuestions: totalQuestions,
                 correctAnswers: finalCorrectAnswersCount,
-                userAnswers: submittedUserAnswers, // Use the submittedUserAnswers
+                userAnswers: submittedUserAnswers,
             };
 
             console.log('QuestionsScreen: Đang gửi kết quả bài làm:', payload);
@@ -388,39 +390,33 @@ const QuestionsScreen = () => {
 
             if (response.ok) {
                 console.log('QuestionsScreen: Kết quả bài làm đã được lưu thành công.');
-                Alert.alert(
+                showCustomAlert(
                     'Hoàn thành bài kiểm tra!',
                     `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${finalCorrectAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
-                    [
-                        {
-                            text: 'Xem lại kết quả',
-                            onPress: () => {
-                                navigation.navigate('Result', {
-                                    testId: testId,
-                                    testTitle: testTitle,
-                                    totalQuestions: totalQuestions,
-                                    correctAnswers: finalCorrectAnswersCount,
-                                    totalScore: totalScore,
-                                    userAnswersHistory: submittedUserAnswers, // Pass submittedUserAnswers
-                                    allQuestions: questions,
-                                });
-                            }
-                        },
-                        {
-                            text: 'Quay về danh sách bài tập',
-                            onPress: () => navigation.pop(2),
-                            style: 'cancel'
-                        }
-                    ]
+                    'Xem lại kết quả',
+                    () => {
+                        navigation.navigate('Result', {
+                            testId: testId,
+                            testTitle: testTitle,
+                            totalQuestions: totalQuestions,
+                            correctAnswers: finalCorrectAnswersCount,
+                            totalScore: totalScore,
+                            userAnswersHistory: submittedUserAnswers,
+                            allQuestions: questions,
+                        });
+                    },
+                    'Về trang chủ',
+                    () => navigation.navigate('MainTabs'),
+                    true
                 );
             } else {
                 const message = response.data?.error || response.data?.message || 'Không thể lưu kết quả bài làm.';
-                Alert.alert('Lỗi', message);
+                showCustomAlert('Lỗi', message, 'OK', () => {}, null, null, false);
                 console.error('QuestionsScreen: Lỗi từ server khi lưu kết quả:', response.status, response.data);
             }
         } catch (err) {
             console.error('QuestionsScreen: Lỗi khi lưu kết quả bài làm:', err);
-            Alert.alert('Lỗi', 'Không thể kết nối đến server để lưu kết quả bài làm.');
+            showCustomAlert('Lỗi', 'Không thể kết nối đến server để lưu kết quả bài làm.', 'OK', () => {}, null, null, false);
         } finally {
             setLoading(false);
         }
@@ -451,7 +447,9 @@ const QuestionsScreen = () => {
             <View style={questionsStyles.noDataContainer}>
                 <Text style={questionsStyles.noDataText}>Không có câu hỏi nào cho bài test này.</Text>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backToTestsButton}>
-                    <Text style={questionsStyles.backToTestsButtonText}>Quay lại danh sách bài tập</Text>
+                    <Text style={questionsStyles.backToTestsButtonText}>
+
+Quay lại danh sách bài tập</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -459,28 +457,20 @@ const QuestionsScreen = () => {
 
     const currentQuestion = questions[currentQuestionIndex];
 
-    // Determine if the "Next" button should be enabled
     const isNextButtonEnabled = 
         (currentQuestion.type_id === 1 && selectedAnswerId !== null) ||
         (currentQuestion.type_id === 2 && userTextInput.trim() !== '');
 
-    // Determine background color for nav arrow buttons (for bottom navigation)
-    const prevButtonBackgroundColor = currentQuestionIndex === 0 ? '#CCCCCC' : '#2196F3'; // Grey if at start, blue otherwise
-    const nextButtonArrowBackgroundColor = isNextButtonEnabled ? '#2196F3' : '#CCCCCC'; // Blue if enabled, gray if disabled
-
+    const prevButtonBackgroundColor = currentQuestionIndex === 0 ? '#CCCCCC' : '#2196F3';
+    const nextButtonArrowBackgroundColor = isNextButtonEnabled ? '#2196F3' : '#CCCCCC';
 
     return (
         <View style={questionsStyles.container}>
-            {/* Status Bar for notch area */}
             <StatusBar barStyle="dark-content" backgroundColor="#F7F7F7" translucent={false} />
-
-            {/* Top Bar with Back Button and Progress Circles */}
             <View style={questionsStyles.topBar}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backButton}>
                     <Image source={require('../images/login_signup/back.png')} style={questionsStyles.backIcon} />
                 </TouchableOpacity>
-
-                {/* Wrapper for progress circles to facilitate centering */}
                 <View style={questionsStyles.progressCirclesWrapper}>
                     <ScrollView
                         horizontal
@@ -507,18 +497,12 @@ const QuestionsScreen = () => {
                         ))}
                     </ScrollView>
                 </View>
-
-                {/* Spacer to balance the back button for visual centering */}
-                {/* It's important that this spacer has the exact same dimensions as the backButton */}
                 <View style={questionsStyles.backButtonSpacer} />
             </View>
 
             <ScrollView ref={scrollViewRef} contentContainerStyle={questionsStyles.questionContentScroll}>
-                {/* Question Card */}
                 <View style={questionsStyles.questionCard}>
-                    {/* Question Content */}
                     <Text style={questionsStyles.questionText}>{currentQuestion.content}</Text>
-
                     {currentQuestion.image_path && (
                         <Image
                             source={{ uri: getFullImageUrl(currentQuestion.image_path) }}
@@ -526,8 +510,6 @@ const QuestionsScreen = () => {
                             onError={(e) => console.log('Lỗi tải ảnh câu hỏi:', e.nativeEvent.error, 'URL:', getFullImageUrl(currentQuestion.image_path))}
                         />
                     )}
-
-                    {/* Audio Player */}
                     {currentQuestion.audio_path && (
                         <View style={questionsStyles.audioPlayerContainer}>
                             <TouchableOpacity onPress={toggleAudioPlayback} style={questionsStyles.playPauseButton}>
@@ -541,19 +523,17 @@ const QuestionsScreen = () => {
                             </Text>
                         </View>
                     )}
-
-                    {/* Answers or Text Input based on type_id */}
                     <View style={questionsStyles.answersContainer}>
-                        {currentQuestion.type_id === 1 ? ( // Multiple Choice
+                        {currentQuestion.type_id === 1 ? (
                             currentQuestion.answers.map((answer) => {
                                 const isSelected = selectedAnswerId === answer.answer_id;
-                                let answerButtonColor = '#FFFFFF'; // Default white
-                                let answerBorderColor = '#D0D0D0'; // Default light gray border
+                                let answerButtonColor = '#FFFFFF';
+                                let answerBorderColor = '#D0D0D0';
                                 let answerTextColor = '#333';
 
                                 if (isSelected) {
-                                    answerButtonColor = '#E3F2FD'; // Light blue for selected
-                                    answerBorderColor = '#2196F3'; // Blue border
+                                    answerButtonColor = '#E3F2FD';
+                                    answerBorderColor = '#2196F3';
                                     answerTextColor = '#2196F3';
                                 }
 
@@ -572,7 +552,7 @@ const QuestionsScreen = () => {
                                     </TouchableOpacity>
                                 );
                             })
-                        ) : ( // Fill-in-the-blank (type_id = 2)
+                        ) : (
                             <View style={questionsStyles.textInputContainer}>
                                 <TextInput
                                     style={questionsStyles.textInputField}
@@ -591,20 +571,18 @@ const QuestionsScreen = () => {
                 </View>
             </ScrollView>
 
-            {/* Navigation Buttons Container at the bottom */}
             <View style={questionsStyles.bottomNavigation}>
                 <TouchableOpacity
                     onPress={handlePreviousQuestion}
                     style={[
                         questionsStyles.navArrowButton,
-                        { backgroundColor: prevButtonBackgroundColor }, // Dynamic background color
-                        currentQuestionIndex === 0 && questionsStyles.navArrowButtonDisabled, // Apply disabled opacity and no shadow
+                        { backgroundColor: prevButtonBackgroundColor },
+                        currentQuestionIndex === 0 && questionsStyles.navArrowButtonDisabled,
                     ]}
                     disabled={currentQuestionIndex === 0}
                 >
                     <Image source={require('../images/left-arrow.png')} style={questionsStyles.navArrowIcon} />
                 </TouchableOpacity>
-
                 <TouchableOpacity
                     style={[
                         questionsStyles.nextButton,
@@ -617,13 +595,12 @@ const QuestionsScreen = () => {
                         {currentQuestionIndex === questions.length - 1 ? 'Submit Quiz' : 'Next'}
                     </Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                     onPress={handleNextQuestion}
                     style={[
                         questionsStyles.navArrowButton,
-                        { backgroundColor: nextButtonArrowBackgroundColor }, // Apply dynamic background color
-                        (!isNextButtonEnabled || currentQuestionIndex === questions.length - 1) && questionsStyles.navArrowButtonDisabled, // Apply disabled opacity and no shadow
+                        { backgroundColor: nextButtonArrowBackgroundColor },
+                        (!isNextButtonEnabled || currentQuestionIndex === questions.length - 1) && questionsStyles.navArrowButtonDisabled,
                         currentQuestionIndex === questions.length - 1 && questionsStyles.navArrowButtonHidden
                     ]}
                     disabled={!isNextButtonEnabled || currentQuestionIndex === questions.length - 1}
@@ -631,6 +608,17 @@ const QuestionsScreen = () => {
                     <Image source={require('../images/right-arrow.png')} style={questionsStyles.navArrowIcon} />
                 </TouchableOpacity>
             </View>
+
+            <CustomAlertDialog
+                isVisible={dialogVisible}
+                title={dialogConfig.title}
+                message={dialogConfig.message}
+                confirmText={dialogConfig.confirmText}
+                cancelText={dialogConfig.cancelText}
+                onConfirm={dialogConfig.onConfirm}
+                onCancel={dialogConfig.onCancel}
+                showCancelButton={dialogConfig.showCancelButton}
+            />
         </View>
     );
 };
@@ -638,7 +626,7 @@ const QuestionsScreen = () => {
 const questionsStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E6EEF9', // Light blue-gray background for the entire screen
+        backgroundColor: '#E6EEF9',
     },
     topBar: {
         flexDirection: 'row',
@@ -665,21 +653,21 @@ const questionsStyles = StyleSheet.create({
         height: 24,
         tintColor: '#333',
     },
-    progressCirclesWrapper: { // New wrapper style
-        flex: 1, // Takes up remaining space in the row
-        flexDirection: 'row', // Ensure children (ScrollView) are laid out in a row within this wrapper
-        justifyContent: 'center', // Centers the ScrollView horizontally if its content is smaller than wrapper
-        alignItems: 'center', // Centers the ScrollView vertically (though it's usually single line)
-        overflow: 'hidden', // Hide overflow content if ScrollView extends beyond its bounds
+    progressCirclesWrapper: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
     },
-    backButtonSpacer: { // New spacer style
-        width: 34, // Approximate width of the back button (icon 24 + padding 5*2 = 34)
+    backButtonSpacer: {
+        width: 34,
     },
-    progressCirclesContentContainer: { // Renamed for clarity, applies to contentContainerStyle
+    progressCirclesContentContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', // Crucial for centering content within the scrollable area
-        minWidth: '100%', // Makes content container stretch to at least 100% of ScrollView's visible width for centering
+        justifyContent: 'center',
+        minWidth: '100%',
     },
     progressCircle: {
         width: 30,
@@ -853,7 +841,7 @@ const questionsStyles = StyleSheet.create({
         shadowRadius: 8,
     },
     nextButton: {
-        backgroundColor: '#2196F3', // Blue color when enabled
+        backgroundColor: '#2196F3',
         paddingVertical: 15,
         paddingHorizontal: 30,
         borderRadius: 30,
@@ -862,7 +850,7 @@ const questionsStyles = StyleSheet.create({
         justifyContent: 'center',
     },
     nextButtonDisabled: {
-        backgroundColor: '#CCCCCC', // Gray color when disabled
+        backgroundColor: '#CCCCCC',
         shadowColor: 'transparent',
         opacity: 0.7,
     },
@@ -878,7 +866,7 @@ const questionsStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0', // Default border for arrow buttons
+        borderColor: '#E0E0E0',
     },
     navArrowButtonDisabled: {
         opacity: 0.5,
@@ -893,7 +881,6 @@ const questionsStyles = StyleSheet.create({
     navArrowIcon: {
         width: 24,
         height: 24,
-        // Removed tintColor to use original image color (white/black from your provided images)
     },
     loadingContainer: {
         flex: 1,

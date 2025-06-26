@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { BASE_URL } from '../utils/constants';
 
 const StartersScreen = () => {
   const navigation = useNavigation();
@@ -10,8 +11,6 @@ const StartersScreen = () => {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const API_BASE_URL = 'http://192.168.1.15:3000'; // Đảm bảo đây là IP đúng cho thiết bị của bạn
 
   // Hàm để xây dựng URL ảnh đầy đủ
   const getFullImageUrl = (imageFileName) => {
@@ -23,7 +22,7 @@ const StartersScreen = () => {
     }
     // Đảm bảo có dấu '/' ở cuối API_BASE_URL nếu cần thiết,
     // và dấu '/' giữa 'images' và tên file.
-    return `${API_BASE_URL}/images/${imageFileName}`;
+    return `${BASE_URL}/images/${imageFileName}`;
   };
 
   // ... (các useEffect và handleLevelPress giữ nguyên) ...
@@ -31,7 +30,7 @@ const StartersScreen = () => {
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/levels`);
+        const response = await fetch(`${BASE_URL}/levels`);
         if (!response.ok) {
           const errorBody = await response.text();
           throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}. Chi tiết: ${errorBody}`);
@@ -71,7 +70,7 @@ const StartersScreen = () => {
       setUnits([]);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/levels/${currentLevel.level_id}/units`);
+        const response = await fetch(`${BASE_URL}/levels/${currentLevel.level_id}/units`);
         if (!response.ok) {
           const errorBody = await response.text();
           throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}. Chi tiết: ${errorBody}`);

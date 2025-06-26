@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import axios from 'axios';
+import { BASE_URL } from '../../utils/constants';
 
 const EditQuestionScreen = ({ route, navigation }) => {
   const { question_id, currentContent, currentAnswer } = route.params;
@@ -10,7 +11,7 @@ const EditQuestionScreen = ({ route, navigation }) => {
 
   const handleUpdate = async () => {
     try {
-      await axios.put(`http://192.168.1.18:3000/questions/${question_id}`, {
+      await axios.put(`${BASE_URL}/questions/${question_id}`, {
         content,
         correct_answer: correctAnswer,
       });

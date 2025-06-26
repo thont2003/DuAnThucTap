@@ -14,10 +14,9 @@ import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import TouchableScale from 'react-native-touchable-scale';
+import { BASE_URL } from '../../utils/constants';
 
 const BackIcon = require('../../images/login_signup/back.png');
-
-const API = 'http://192.168.1.53:3000';
 
 const TestSelectorScreen = () => {
   const navigation = useNavigation();
@@ -31,7 +30,7 @@ const TestSelectorScreen = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    axios.get(`${API}/levels`)
+    axios.get(`${BASE_URL}/levels`)
       .then((r) => {
         setLevels(r.data);
         if (r.data.length > 0 && !level) {
@@ -48,7 +47,7 @@ const TestSelectorScreen = () => {
     if (level) {
       setUnit('');
       setTests([]);
-      axios.get(`${API}/units/by-level/${level}`) // Check this endpoint with your backend
+      axios.get(`${BASE_URL}/units/by-level/${level}`) // Check this endpoint with your backend
         .then((r) => {
           setUnits(r.data);
           if (r.data.length > 0) {
@@ -73,7 +72,7 @@ const TestSelectorScreen = () => {
     if (level && unit) {
       setLoading(true);
       axios
-        .get(`${API}/tests`, { params: { level_id: level, unit_id: unit, type_id: questionTypeId } })
+        .get(`${BASE_URL}/tests`, { params: { level_id: level, unit_id: unit, type_id: questionTypeId } })
         .then((r) => setTests(r.data))
         .catch((err) => {
           console.error('Lỗi khi tải tests:', err);
