@@ -9,9 +9,10 @@ import {
     LayoutAnimation,
     Platform,
     UIManager,
-    Alert
+    Alert,
+    BackHandler // Import BackHandler
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { BASE_URL } from '../utils/constants';
 
 // Import Sound library
@@ -33,9 +34,9 @@ const ResultScreen = () => {
         testTitle,
         totalQuestions,
         correctAnswers,
-        totalScore = Math.round((correctAnswers / totalQuestions) * 100), // Sử dụng giá trị mặc định nếu không có từ params
-        userAnswersHistory, // Lịch sử câu trả lời của người dùng
-        allQuestions // Tất cả câu hỏi gốc
+        totalScore = Math.round((correctAnswers / totalQuestions) * 100),
+        userAnswersHistory,
+        allQuestions
     } = route.params;
 
     const [showIncorrectOnly, setShowIncorrectOnly] = useState(false);
@@ -155,6 +156,21 @@ const ResultScreen = () => {
         }, [stopAndReleaseSound])
     );
 
+    // Handle Android hardware back button
+    useEffect(() => {
+        const backAction = () => {
+            handleBackToHome();
+            return true; // Prevent default behavior
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+
+        return () => backHandler.remove(); // Clean up the event listener
+    }, [navigation]);
+
     // Modified to handle both question types for display
     const getCorrectAnswerDisplay = (question) => {
         if (question.type_id === 1) { // Multiple Choice
@@ -175,27 +191,40 @@ const ResultScreen = () => {
         return userAnswer.answerText;
     };
 
-    const toggleShowIncorrectOnly = () => {
+    const toggleShowIncorrectOnly = (showOnly) => { // Added parameter
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setShowIncorrectOnly(prev => {
-            if (prev === false) { // If changing to show incorrect only
-                stopAndReleaseSound(); // Stop currently playing audio
-            }
-            return !prev;
-        });
+        setShowIncorrectOnly(showOnly); // Set state directly based on param
+        if (showOnly === false) { // If changing to show all questions
+            stopAndReleaseSound(); // Stop currently playing audio
+        }
     };
 
     const questionsToDisplay = showIncorrectOnly ? incorrectQuestions : allQuestions;
 
+    const handleBackToHome = () => {
+        // Stop any playing audio before navigating away
+        stopAndReleaseSound(); 
+        // Reset the navigation stack to the 'MainTabs' route, specifically opening the 'HomeTab'
+        navigation.dispatch(
+            CommonActions.reset({
+                index: 0, // Set index to 0 to make 'MainTabs' the only route in the stack
+                routes: [
+                    {
+                        name: 'MainTabs',
+                        params: {
+                            screen: 'HomeTab', // Specify the screen within MainTabs
+                        },
+                    },
+                ],
+            })
+        );
+    };
+
     return (
         <View style={styles.container}>
-            {/* Header */}
+            {/* Header - Removed back button */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.pop(2)} style={styles.backButton}>
-                    <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Kết quả bài làm</Text>
-                <View style={{ width: 30 }} />{/* Spacer */}
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -301,7 +330,7 @@ const ResultScreen = () => {
 
             <TouchableOpacity
                 style={styles.backToTestsButton}
-                onPress={() => navigation.navigate('MainTabs')}
+                onPress={handleBackToHome}
             >
                 <Text style={styles.backToTestsButtonText}>Quay lại trang chủ</Text>
             </TouchableOpacity>
@@ -328,14 +357,7 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         zIndex: 1,
     },
-    backButton: {
-        padding: 5,
-    },
-    backIcon: {
-        width: 24,
-        height: 24,
-        tintColor: '#333',
-    },
+    // Removed backButton and backIcon styles as the back button is removed from the UI
     headerTitle: {
         flex: 1,
         textAlign: 'center',
@@ -425,12 +447,11 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         backgroundColor: '#EAEAEA',
     },
-    // NEW: Styles for audio player in ResultScreen
     audioPlayerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F0F0F0', // Slightly different background for audio
+        backgroundColor: '#F0F0F0',
         padding: 10,
         borderRadius: 8,
         marginBottom: 15,
@@ -458,18 +479,18 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#333',
         fontWeight: '500',
-        flexShrink: 1, // Allow text to wrap/shrink
+        flexShrink: 1,
     },
     answerStatusText: (isCorrect) => ({
         fontSize: 16,
         fontWeight: 'bold',
-        color: isCorrect ? '#28A745' : '#DC3545', // Green for correct, Red for incorrect
+        color: isCorrect ? '#28A745' : '#DC3545',
         marginBottom: 5,
     }),
     correctAnswerText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#28A745', // Green for correct answer
+        color: '#28A745',
         marginBottom: 10,
     },
     optionsContainer: {
@@ -486,21 +507,21 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     correctOption: {
-        backgroundColor: '#D4EDDA', // Light green
+        backgroundColor: '#D4EDDA',
         fontWeight: 'bold',
-        color: '#155724', // Dark green text
+        color: '#155724',
     },
     wrongOption: {
-        backgroundColor: '#F8D7DA', // Light red
+        backgroundColor: '#F8D7DA',
         fontWeight: 'bold',
-        color: '#721C24', // Dark red text
+        color: '#721C24',
     },
     backToTestsButton: {
         position: 'absolute',
         bottom: 20,
         left: 20,
         right: 20,
-        backgroundColor: '#6C757D', // Gray color
+        backgroundColor: '#6C757D',
         paddingVertical: 15,
         borderRadius: 10,
         alignItems: 'center',

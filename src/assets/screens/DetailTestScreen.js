@@ -86,8 +86,8 @@ const DetailTestScreen = () => {
                 <View style={styles.infoRow}>
                     <Image source={require('../images/question.png')} style={styles.infoIcon} />
                     <View>
-                        <Text style={styles.infoMainText}>{questionCount || 'Đang cập nhật'} Question</Text>
-                        <Text style={styles.infoSubText}>100 point for a correct answer</Text>
+                        <Text style={styles.infoMainText}>{questionCount || 'Đang cập nhật'} Câu hỏi</Text>
+                        <Text style={styles.infoSubText}>Bạn sẽ được 10 điểm cho mỗi câu hỏi</Text>
                     </View>
                 </View>
 
@@ -95,8 +95,8 @@ const DetailTestScreen = () => {
                 <View style={styles.infoRow}>
                     <Image source={require('../images/group.png')} style={styles.infoIcon} />
                     <View>
-                        <Text style={styles.infoMainText}>{currentPlayCount} Times</Text>
-                        <Text style={styles.infoSubText}>Total number of test attempts</Text>
+                        <Text style={styles.infoMainText}>Bạn đã làm {currentPlayCount} lần</Text>
+                        <Text style={styles.infoSubText}>Tổng số lần đã làm</Text>
                     </View>
                 </View>
             </View>
