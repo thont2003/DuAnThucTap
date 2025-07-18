@@ -166,7 +166,7 @@ const TestSelectorScreen = () => {
                 style={styles.testItem}
               >
                 <Image
-                  source={{ uri: `${API}${item.image_url}` }}
+                  source={{ uri: `${BASE_URL}${item.image_url}` }}
                   style={styles.image}
                   onError={(e) => console.log('Image loading error for:', item.image_url, e.nativeEvent.error)}
                 />

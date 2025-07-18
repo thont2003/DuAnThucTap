@@ -40,6 +40,8 @@ const QuestionsScreen = () => {
     const [isPlayingAudio, setIsPlayingAudio] = useState(false);
     const soundRef = useRef(null);
     const scrollViewRef = useRef(null);
+    // NEW STATE: To track if the quiz has been submitted
+    const [quizSubmitted, setQuizSubmitted] = useState(false); 
 
     // State for CustomAlertDialog
     const [dialogVisible, setDialogVisible] = useState(false);
@@ -175,6 +177,8 @@ const QuestionsScreen = () => {
                 setCorrectAnswersCount(0);
                 setUserAnswersHistory([]);
                 stopAndReleaseSound();
+                // Reset quizSubmitted state when new questions are fetched
+                setQuizSubmitted(false); 
             } else {
                 const message = response.data?.error || response.data?.message || 'Không thể tải câu hỏi.';
                 setError(message);
@@ -238,25 +242,33 @@ const QuestionsScreen = () => {
         }
     }, [currentQuestionIndex, questions, userAnswersHistory]);
 
+    // MODIFIED useEffect: Conditionally attach the listener
     useEffect(() => {
-        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-            e.preventDefault();
-            showCustomAlert(
-                'Thoát khỏi bài làm?',
-                'Bạn có chắc muốn thoát khỏi bài làm không? Tiến độ hiện tại sẽ không được lưu.',
-                'Có',
-                () => {
-                    stopAndReleaseSound();
-                    navigation.dispatch(e.data.action);
-                },
-                'Không',
-                () => {},
-                true
-            );
-        });
+        let unsubscribe;
+        if (!quizSubmitted) { // Only attach if quiz hasn't been submitted
+            unsubscribe = navigation.addListener('beforeRemove', (e) => {
+                e.preventDefault();
+                showCustomAlert(
+                    'Thoát khỏi bài làm?',
+                    'Bạn có chắc muốn thoát khỏi bài làm không? Tiến độ hiện tại sẽ không được lưu.',
+                    'Có',
+                    () => {
+                        stopAndReleaseSound();
+                        navigation.dispatch(e.data.action);
+                    },
+                    'Không',
+                    () => {},
+                    true
+                );
+            });
+        }
 
-        return unsubscribe;
-    }, [navigation, stopAndReleaseSound]);
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
+    }, [navigation, stopAndReleaseSound, quizSubmitted]); // Add quizSubmitted to dependency array
 
     const handleAnswerPress = (answer) => {
         setSelectedAnswerId(answer.answer_id);
@@ -390,23 +402,33 @@ const QuestionsScreen = () => {
 
             if (response.ok) {
                 console.log('QuestionsScreen: Kết quả bài làm đã được lưu thành công.');
+                // SET NEW STATE TO TRUE: Quiz is now submitted
+                setQuizSubmitted(true); 
+
                 showCustomAlert(
                     'Hoàn thành bài kiểm tra!',
                     `Bạn đã hoàn thành bài ${testTitle}.\nSố câu đúng: ${finalCorrectAnswersCount}/${totalQuestions}\nĐiểm của bạn: ${totalScore}`,
                     'Xem lại kết quả',
                     () => {
-                        navigation.navigate('Result', {
-                            testId: testId,
-                            testTitle: testTitle,
-                            totalQuestions: totalQuestions,
-                            correctAnswers: finalCorrectAnswersCount,
-                            totalScore: totalScore,
-                            userAnswersHistory: submittedUserAnswers,
-                            allQuestions: questions,
-                        });
+                        // Ensure we navigate after the dialog closes
+                        setTimeout(() => {
+                            navigation.navigate('Result', {
+                                testId: testId,
+                                testTitle: testTitle,
+                                totalQuestions: totalQuestions,
+                                correctAnswers: finalCorrectAnswersCount,
+                                totalScore: totalScore,
+                                userAnswersHistory: submittedUserAnswers,
+                                allQuestions: questions,
+                            });
+                        }, 100); // Small delay to allow dialog to fully close
                     },
                     'Về trang chủ',
-                    () => navigation.navigate('MainTabs'),
+                    () => {
+                        setTimeout(() => {
+                            navigation.navigate('MainTabs');
+                        }, 100); // Small delay
+                    },
                     true
                 );
             } else {
@@ -446,10 +468,10 @@ const QuestionsScreen = () => {
         return (
             <View style={questionsStyles.noDataContainer}>
                 <Text style={questionsStyles.noDataText}>Không có câu hỏi nào cho bài test này.</Text>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={questionsStyles.backToTestsButton}>
+                <TouchableOpacity onPress={() => navigation.navigate('MainTabs')} style={questionsStyles.backToTestsButton}>
                     <Text style={questionsStyles.backToTestsButtonText}>
 
-Quay lại danh sách bài tập</Text>
+Quay lại trang chủ</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -500,7 +522,12 @@ Quay lại danh sách bài tập</Text>
                 <View style={questionsStyles.backButtonSpacer} />
             </View>
 
-            <ScrollView ref={scrollViewRef} contentContainerStyle={questionsStyles.questionContentScroll}>
+            <ScrollView 
+                ref={scrollViewRef} 
+                contentContainerStyle={questionsStyles.questionContentScroll}
+                showsVerticalScrollIndicator={true}
+                style={questionsStyles.scrollView}
+            >
                 <View style={questionsStyles.questionCard}>
                     <Text style={questionsStyles.questionText}>{currentQuestion.content}</Text>
                     {currentQuestion.image_path && (
@@ -592,7 +619,7 @@ Quay lại danh sách bài tập</Text>
                     disabled={!isNextButtonEnabled}
                 >
                     <Text style={questionsStyles.nextButtonText}>
-                        {currentQuestionIndex === questions.length - 1 ? 'Submit Quiz' : 'Next'}
+                        {currentQuestionIndex === questions.length - 1 ? 'Hoàn thành' : 'Tiếp'}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -626,27 +653,85 @@ Quay lại danh sách bài tập</Text>
 const questionsStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E6EEF9',
+        backgroundColor: '#F7F7F7',
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F7F7F7',
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#555',
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#F7F7F7',
+    },
+    errorText: {
+        fontSize: 18,
+        color: '#D32F2F',
+        textAlign: 'center',
+        marginBottom: 15,
+    },
+    retryButton: {
+        backgroundColor: '#2196F3',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    noDataContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#F7F7F7',
+    },
+    noDataText: {
+        fontSize: 18,
+        color: '#555',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    backToTestsButton: {
+        backgroundColor: '#2196F3',
+        paddingVertical: 12,
+        paddingHorizontal: 25,
+        borderRadius: 8,
+    },
+    backToTestsButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 15,
-        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 50,
-        paddingBottom: 20,
-        backgroundColor: '#F7F7F7',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        elevation: 5,
+        paddingVertical: 10,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+        elevation: 2,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 5,
-        zIndex: 2,
-        position: 'relative',
+        shadowRadius: 1.5,
     },
     backButton: {
-        padding: 5,
+        padding: 8,
     },
     backIcon: {
         width: 24,
@@ -655,175 +740,139 @@ const questionsStyles = StyleSheet.create({
     },
     progressCirclesWrapper: {
         flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    backButtonSpacer: {
-        width: 34,
+        marginHorizontal: 10,
+        height: 40, 
     },
     progressCirclesContentContainer: {
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: '100%',
     },
     progressCircle: {
         width: 30,
         height: 30,
         borderRadius: 15,
-        borderWidth: 2,
-        borderColor: '#BBDEFB',
-        backgroundColor: 'white',
+        backgroundColor: '#E0E0E0',
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 5,
+        borderWidth: 1,
+        borderColor: '#B0B0B0',
     },
     progressCircleActive: {
-        borderColor: '#2196F3',
         backgroundColor: '#2196F3',
+        borderColor: '#1976D2',
     },
     progressCircleCompleted: {
-        borderColor: '#4CAF50',
         backgroundColor: '#4CAF50',
+        borderColor: '#388E3C',
     },
     progressCircleText: {
+        color: '#555',
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#757575',
     },
     progressCircleTextActive: {
-        color: 'white',
+        color: '#FFFFFF',
     },
     progressCircleTextCompleted: {
-        color: 'white',
+        color: '#FFFFFF',
+    },
+    backButtonSpacer: {
+        width: 40, // To balance the back button space
+    },
+    scrollView: {
+        flex: 1,
     },
     questionContentScroll: {
-        flex: 1,
+        flexGrow: 1,
         paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 20,
     },
     questionCard: {
-        backgroundColor: 'white',
-        borderRadius: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 15,
         padding: 20,
-        marginBottom: 20,
-        marginTop: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
         elevation: 5,
+        marginBottom: 20,
     },
     questionText: {
-        fontSize: 22,
-        fontWeight: '600',
+        fontSize: 20,
+        fontWeight: 'bold',
         color: '#333',
-        marginBottom: 20,
-        textAlign: 'center',
-        lineHeight: 30,
+        marginBottom: 15,
+        lineHeight: 28,
     },
     questionImage: {
         width: '100%',
         height: 200,
         borderRadius: 10,
+        marginBottom: 15,
         resizeMode: 'contain',
-        marginBottom: 20,
-        backgroundColor: '#EAEAEA',
-        borderColor: '#DDD',
-        borderWidth: 1,
+        backgroundColor: '#eee',
     },
     audioPlayerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#EAEAEA',
-        padding: 15,
+        backgroundColor: '#F0F0F0',
         borderRadius: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 15,
         marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
     },
     playPauseButton: {
-        padding: 10,
-        borderRadius: 25,
-        backgroundColor: '#1E90FF',
-        marginRight: 15,
-        shadowColor: '#1E90FF',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        padding: 5,
     },
     playPauseIcon: {
         width: 30,
         height: 30,
-        tintColor: '#FFFFFF',
+        tintColor: '#2196F3',
     },
     audioFileName: {
+        marginLeft: 10,
         fontSize: 16,
-        color: '#333',
-        fontWeight: '500',
+        color: '#555',
+        flexShrink: 1,
     },
     answersContainer: {
-        marginBottom: 10,
+        marginTop: 10,
     },
     answerButton: {
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
+        padding: 15,
         borderRadius: 10,
+        borderWidth: 1.5,
         marginBottom: 10,
-        borderWidth: 2,
-        borderColor: '#D0D0D0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    answerText: {
-        fontSize: 18,
-        fontWeight: '500',
-        color: '#333',
-        textAlign: 'center',
-    },
-    textInputContainer: {
-        marginBottom: 10,
-    },
-    textInputField: {
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        fontSize: 18,
-        color: '#333',
         minHeight: 50,
     },
-    feedbackContainer: {
-        marginTop: 10,
-        padding: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    feedbackText: {
-        fontSize: 16,
-        fontWeight: 'bold',
+    answerText: {
+        fontSize: 17,
+        fontWeight: '500',
         textAlign: 'center',
+        flexShrink: 1,
     },
-    correctFeedback: {
-        color: '#28A745',
+    textInputContainer: {
+        borderWidth: 1.5,
+        borderColor: '#D0D0D0',
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        paddingVertical: Platform.OS === 'ios' ? 15 : 5, 
+        minHeight: 120,
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
     },
-    incorrectFeedback: {
-        color: '#DC3545',
+    textInputField: {
+        fontSize: 17,
+        color: '#333',
+        flex: 1,
+        width: '100%',
+        textAlignVertical: 'top',
+        paddingTop: Platform.OS === 'android' ? 10 : 0, 
     },
     bottomNavigation: {
         flexDirection: 'row',
@@ -839,41 +888,19 @@ const questionsStyles = StyleSheet.create({
         shadowOffset: { width: 0, height: -5 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
-    },
-    nextButton: {
-        backgroundColor: '#2196F3',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
-        borderRadius: 30,
-        minWidth: width * 0.4,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    nextButtonDisabled: {
-        backgroundColor: '#CCCCCC',
-        shadowColor: 'transparent',
-        opacity: 0.7,
-    },
-    nextButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        zIndex: 1,
     },
     navArrowButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        backgroundColor: '#2196F3',
     },
     navArrowButtonDisabled: {
-        opacity: 0.5,
-        borderColor: '#F0F0F0',
-        shadowOpacity: 0,
-        elevation: 0,
-        shadowColor: 'transparent',
+        opacity: 0.6,
+        backgroundColor: '#CCCCCC',
     },
     navArrowButtonHidden: {
         opacity: 0,
@@ -881,64 +908,23 @@ const questionsStyles = StyleSheet.create({
     navArrowIcon: {
         width: 24,
         height: 24,
+        tintColor: '#FFFFFF',
     },
-    loadingContainer: {
+    nextButton: {
         flex: 1,
+        backgroundColor: '#2196F3',
+        paddingVertical: 15,
+        borderRadius: 10,
+        marginHorizontal: 15,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#E6EEF9',
     },
-    loadingText: {
-        marginTop: 10,
-        fontSize: 16,
-        color: '#555',
+    nextButtonDisabled: {
+        backgroundColor: '#CCCCCC',
     },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#E6EEF9',
-    },
-    errorText: {
-        fontSize: 16,
-        color: 'red',
-        textAlign: 'center',
-        marginBottom: 15,
-    },
-    retryButton: {
-        backgroundColor: '#1E90FF',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-    },
-    retryButtonText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    noDataContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#E6EEF9',
-        padding: 20,
-    },
-    noDataText: {
+    nextButtonText: {
+        color: '#FFFFFF',
         fontSize: 18,
-        color: '#777',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    backToTestsButton: {
-        backgroundColor: '#6C757D',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-    },
-    backToTestsButtonText: {
-        color: '#fff',
-        fontSize: 15,
         fontWeight: 'bold',
     },
 });

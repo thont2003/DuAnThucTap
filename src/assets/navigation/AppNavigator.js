@@ -1,17 +1,16 @@
-// AppNavigator.js
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'; // Import this
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Image, Text, StyleSheet } from 'react-native'; // Import these for custom tab bar icons
 
 // Import all your screens
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
-import HomeScreen from '../screens/HomeScreen'; // This will be part of the tabs
-import HistoryScreen from '../screens/HistoryScreen'; // This will be part of the tabs
-import RankingScreen from '../screens/RankingScreen'; // This will be part of the tabs
-import AccountScreen from '../screens/AccountScreen'; // This will be part of the tabs
+import HomeScreen from '../screens/HomeScreen';
+import HistoryScreen from '../screens/HistoryScreen';
+import RankingScreen from '../screens/RankingScreen';
+import AccountScreen from '../screens/AccountScreen';
 import StartersScreen from '../screens/StartersScreen';
 import UnitsScreen from '../screens/UnitsScreen';
 import IntroScreen from '../screens/IntroScreen';
@@ -36,9 +35,9 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator(); // Define Tab navigator here
+const Tab = createBottomTabNavigator();
 
-// Styles for the Bottom Tab Navigator (can be defined directly or in a separate stylesheet)
+// Styles for the Bottom Tab Navigator
 const tabStyles = StyleSheet.create({
     tabBar: {
         height: 70,
@@ -52,14 +51,21 @@ const tabStyles = StyleSheet.create({
         shadowRadius: 5,
         backgroundColor: '#FFFFFF',
     },
+    // Adjust tabBarLabel style to move it up (closer to icon) or remove marginTop if you want default spacing
     tabBarLabel: {
         fontSize: 11,
         fontWeight: '600',
-        marginTop: -30,
+        marginTop: 5, // Adjusted from -30 to a positive value for better visibility/default behavior
     },
+    tabBarItemContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingTop: 5, // Add padding to push content down from top of tab bar area
+    }
 });
 
-// Define the MainTabNavigator component directly inside AppNavigator.js
+// MainTabNavigator component encapsulates the bottom tabs
 const MainTabNavigator = () => {
     return (
         <Tab.Navigator
@@ -67,43 +73,64 @@ const MainTabNavigator = () => {
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused }) => {
                     let iconSource;
-                    let label;
+                    let labelText; // Use a specific variable for label text
                     const iconSize = 28;
 
                     if (route.name === 'HomeTab') {
-                        iconSource = focused 
-                          ? require('../images/tabbar/homeblue-icon.png') 
-                          : require('../images/tabbar/home-icon.png');
-                        
+                        iconSource = focused
+                            ? require('../images/tabbar/homeblue-icon.png')
+                            : require('../images/tabbar/home-icon.png');
+                        labelText = 'Trang chủ';
                     } else if (route.name === 'HistoryTab') {
-                        iconSource = focused 
-                            ? require('../images/tabbar/historyblue-icon.png') 
+                        iconSource = focused
+                            ? require('../images/tabbar/historyblue-icon.png')
                             : require('../images/tabbar/history-icon.png');
-                        
+                        labelText = 'Lịch sử';
                     } else if (route.name === 'RankingTab') {
-                        iconSource = focused 
-                            ? require('../images/tabbar/rankingblue-icon.png') 
+                        iconSource = focused
+                            ? require('../images/tabbar/rankingblue-icon.png')
                             : require('../images/tabbar/ranking-icon.png');
-                        
+                        labelText = 'Xếp hạng';
                     } else if (route.name === 'AccountTab') {
-                        iconSource = focused 
-                            ? require('../images/tabbar/accountblue-icon.png') 
+                        iconSource = focused
+                            ? require('../images/tabbar/accountblue-icon.png')
                             : require('../images/tabbar/account-icon.png');
+                        labelText = 'Tài khoản';
                     }
 
-
                     return (
-                        <>
-                            <Image source={iconSource} style={{ width: iconSize, height: iconSize, resizeMode: 'contain' }} />
-                            <Text style={[tabStyles.tabBarLabel, { color: focused ? '#1E90FF' : '#555' }]}>
-                                {label}
-                            </Text>
-                        </>
+                        <Image
+                            source={iconSource}
+                            style={{
+                                width: iconSize,
+                                height: iconSize,
+                                resizeMode: 'contain',
+                                tintColor: focused ? '#1E90FF' : '#555', // Apply tint color directly to image
+                            }}
+                        />
+                        // No need for a separate Text component here, as tabBarLabel handles it
                     );
                 },
-                tabBarShowLabel: false,
+                tabBarLabel: ({ focused }) => {
+                    let labelText;
+                    if (route.name === 'HomeTab') {
+                        labelText = 'Trang chủ';
+                    } else if (route.name === 'HistoryTab') {
+                        labelText = 'Lịch sử';
+                    } else if (route.name === 'RankingTab') {
+                        labelText = 'Xếp hạng';
+                    } else if (route.name === 'AccountTab') {
+                        labelText = 'Tài khoản';
+                    }
+                    return (
+                        <Text style={[tabStyles.tabBarLabel, { color: focused ? '#1E90FF' : '#555' }]}>
+                            {labelText}
+                        </Text>
+                    );
+                },
+                tabBarShowLabel: true, // Make sure labels are shown
                 tabBarStyle: tabStyles.tabBar,
-                headerShown: false,
+                headerShown: false, // Hide header for screens within the tab navigator
             })}
         >
             <Tab.Screen name="HomeTab" component={HomeScreen} />
@@ -114,133 +141,48 @@ const MainTabNavigator = () => {
     );
 };
 
+// AppNavigator is the main Stack Navigator that wraps everything
 const AppNavigator = () => {
     return (
         <NavigationContainer>
             <Stack.Navigator initialRouteName="IntroScreen">
-                <Stack.Screen
-                    name="Register"
-                    component={RegisterScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Login"
-                    component={LoginScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="IntroScreen"
-                    component={IntroScreen}
-                    options={{ headerShown: false }}
-                />
-                {/* Integrate MainTabNavigator here */}
+                {/* Authentication and Intro Screens */}
+                <Stack.Screen name="IntroScreen" component={IntroScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="ForgotPasswordScreen" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+
+
+                {/* Main application tabs */}
                 <Stack.Screen
                     name="MainTabs"
-                    component={MainTabNavigator} // Use the defined component here
+                    component={MainTabNavigator} // This is where your tabs are integrated
                     options={{ headerShown: false }}
                 />
-                {/* Screens that are not part of the bottom tabs */}
-                <Stack.Screen
-                    name="Starters"
-                    component={StartersScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Units"
-                    component={UnitsScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="TestScreen"
-                    component={TestScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="DetailTest"
-                    component={DetailTestScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Questions"
-                    component={QuestionsScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Result"
-                    component={ResultScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="DragAndDrop"
-                    component={DragAndDropScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="EditProfileScreen"
-                  component={EditProfileScreen}
-                  options={{ headerShown: false }}
-                />
-                    <Stack.Screen
-                    name="AdminScreen"
-                    component={AdminScreen}
-                    options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                    name="LevelScreen"
-                    component={LevelScreen}
-                    options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                    name="UnitScreen"
-                    component={UnitScreen}
-                    options={{ headerShown: false }}
-                />
-                
-                 <Stack.Screen
-                    name="EditQuestionScreen"
-                    component={EditQuestionScreen}
-                    options={{ headerShown: false }}
-                />
-                 <Stack.Screen
-                    name="QuestionListScreen"
-                    component={QuestionListScreen}
-                    options={{ headerShown: false }}
-                />
-                 <Stack.Screen
-                    name="QuestionTypeScreen"
-                    component={QuestionTypeScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="ChangePasswordScreen"
-                    component={ChangePasswordScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="UserManagementScreen"
-                    component={UserManagementScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="TestSelectorScreen"
-                    component={TestSelectorScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="TestADScreen"
-                    component={TestADScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="ContactSupportScreen"
-                    component={ContactSupportScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="ForgotPasswordScreen"
-                    component={ForgotPasswordScreen}
-                    options={{ headerShown: false }}
-                />
+
+                {/* Screens accessible from tabs or other flows (not part of the bottom tabs) */}
+                <Stack.Screen name="Starters" component={StartersScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Units" component={UnitsScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="TestScreen" component={TestScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="DetailTest" component={DetailTestScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Questions" component={QuestionsScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Result" component={ResultScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="DragAndDrop" component={DragAndDropScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="ChangePasswordScreen" component={ChangePasswordScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="ContactSupportScreen" component={ContactSupportScreen} options={{ headerShown: false }} />
+
+
+                {/* Admin Screens (if applicable, separate them logically) */}
+                <Stack.Screen name="AdminScreen" component={AdminScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="LevelScreen" component={LevelScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="UnitScreen" component={UnitScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="QuestionTypeScreen" component={QuestionTypeScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="QuestionListScreen" component={QuestionListScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="EditQuestionScreen" component={EditQuestionScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="UserManagementScreen" component={UserManagementScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="TestSelectorScreen" component={TestSelectorScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="TestADScreen" component={TestADScreen} options={{ headerShown: false }} />
             </Stack.Navigator>
         </NavigationContainer>
     );

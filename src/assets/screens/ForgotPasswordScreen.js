@@ -76,13 +76,13 @@ const ForgotPasswordScreen = () => {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.loginTitle}>Forgot Password</Text>
+          <Text style={styles.loginTitle}>Quên mật khẩu</Text>
 
-          <Text style={styles.inputLabel}>Enter your email</Text>
+          <Text style={styles.inputLabel}>Nhập địa chỉ email</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="Your email address"
+              placeholder="Địa chỉ email của bạn"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -92,7 +92,7 @@ const ForgotPasswordScreen = () => {
           </View>
 
           <TouchableOpacity style={styles.loginButton} onPress={handleResetPassword} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Send</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginButtonText}>Gửi</Text>}
           </TouchableOpacity>
         </View>
 

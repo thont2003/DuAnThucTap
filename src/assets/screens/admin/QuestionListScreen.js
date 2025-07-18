@@ -85,7 +85,7 @@ const QuestionListScreen = ({ route }) => {
         setIsLoading(true);
         setRefreshing(true); // Bắt đầu làm mới
         try {
-            const { data } = await axios.get(`${API}/questions`, {
+            const { data } = await axios.get(`${BASE_URL}/questions`, {
                 params: { test_id: testId, type_id: questionTypeId }
             });
             setQuestions(data);
@@ -257,7 +257,7 @@ const QuestionListScreen = ({ route }) => {
                 payload.answers = editForm.answers;
             }
 
-            await axios.put(`${API}/questions/${editingId}`, payload);
+            await axios.put(`${BASE_URL}/questions/${editingId}`, payload);
             Alert.alert('Thành công', 'Câu hỏi đã được cập nhật.');
             resetForm();
             fetchQuestions();
@@ -281,7 +281,7 @@ const QuestionListScreen = ({ route }) => {
     const deleteQuestion = async (id) => {
         setIsLoading(true);
         try {
-            await axios.delete(`${API}/questions/${id}`);
+            await axios.delete(`${BASE_URL}/questions/${id}`);
             Alert.alert('Thành công', 'Câu hỏi đã được xóa.');
             fetchQuestions();
         } catch (e) {
@@ -331,7 +331,7 @@ const QuestionListScreen = ({ route }) => {
                 payload.answers = addForm.answers;
             }
 
-            await axios.post(`${API}/questions`, payload);
+            await axios.post(`${BASE_URL}/questions`, payload);
             Alert.alert('Thành công', 'Câu hỏi đã được thêm.');
             resetForm();
             fetchQuestions();
@@ -388,7 +388,7 @@ const QuestionListScreen = ({ route }) => {
                         {(currentForm.selectedImageUri || currentForm.image_path) ? (
                             <View style={styles.previewImageContainer}>
                                 <Image
-                                    source={{ uri: currentForm.selectedImageUri ? currentForm.selectedImageUri : `${API}${currentForm.image_path}` }}
+                                    source={{ uri: currentForm.selectedImageUri ? currentForm.selectedImageUri : `${BASE_URL}${currentForm.image_path}` }}
                                     style={styles.previewImage}
                                     onError={(e) => console.log('Error loading image for edit form:', e.nativeEvent.error)}
                                 />
@@ -450,7 +450,7 @@ const QuestionListScreen = ({ route }) => {
                 ) : ( // Hiển thị thông tin câu hỏi
                     <>
                         <Text style={styles.content}>{item.content}</Text>
-                        {item.image_path ? <Image source={{ uri: `${API}${item.image_path}` }} style={styles.thumb} onError={(e) => console.log('Error loading image for display:', item.image_path, e.nativeEvent.error)} /> : null}
+                        {item.image_path ? <Image source={{ uri: `${BASE_URL}${item.image_path}` }} style={styles.thumb} onError={(e) => console.log('Error loading image for display:', item.image_path, e.nativeEvent.error)} /> : null}
                         {questionTypeId === 2 ? (
                             <Text style={styles.correctAnswerDisplay}>Đúng: {item.correct_answer}</Text>
                         ) : (

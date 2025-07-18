@@ -145,7 +145,7 @@ const UnitsScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Image source={require('../images/login_signup/back.png')} style={styles.backIcon} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>List of exercises</Text>
+                    <Text style={styles.headerTitle}>Danh sách bài tập</Text>
                     <View style={{ width: 30 }} />
                 </View>
                 {/* Tabs */}

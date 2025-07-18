@@ -247,8 +247,8 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // Cấu hình kết nối PostgreSQL
 const pool = new Pool({
     user: 'postgres',
-    host: '192.168.1.3', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
-    database: 'mmm',
+    host: '192.168.1.188', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+    database: 'english',
     password: '123',
     port: 5432,
 });
@@ -1132,6 +1132,593 @@ app.put('/api/users/:id/role', async (req, res) => {
     console.error('Lỗi khi cập nhật vai trò:', err);
     res.status(500).json({ error: 'Lỗi server khi cập nhật vai trò' });
   }
+});
+
+/**
+ * GET /tests/:id
+ * Lấy thông tin chi tiết của một bài test theo ID.
+ */
+// Thêm đoạn code này vào file backend (ví dụ: app.js hoặc server.js) của bạn
+
+app.get('/tests', async (req, res) => {
+    try {
+        const { level_id, unit_id } = req.query; // Lấy level_id và unit_id từ query parameters
+
+        let query = 'SELECT test_id, level_id, unit_id, title, description, image_url, play_count FROM tests';
+        const params = [];
+        const conditions = [];
+
+        if (level_id) {
+            conditions.push('level_id = $' + (conditions.length + 1));
+            params.push(parseInt(level_id));
+        }
+        if (unit_id) {
+            conditions.push('unit_id = $' + (conditions.length + 1));
+            params.push(parseInt(unit_id));
+        }
+
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        query += ' ORDER BY test_id ASC'; // Sắp xếp theo test_id
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Lỗi khi lấy danh sách tests:', err);
+        res.status(500).json({ error: 'Lỗi server, không thể lấy dữ liệu tests.' });
+    }
+});
+/**
+ * POST /tests
+ * Tạo một bài test mới.
+ * Trường `image_url` trong body sẽ chứa đường dẫn URL của ảnh đã được tải lên.
+ */
+app.post('/tests', async (req, res) => {
+    const { level_id, unit_id, title, image_url, description } = req.body;
+
+    if (!level_id || !title) {
+        return res.status(400).json({ error: 'Thiếu level_id hoặc title cho bài test.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO tests (level_id, unit_id, title, image_url, description)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [parseInt(level_id), unit_id ? parseInt(unit_id) : null, title, image_url || null, description || null]
+        );
+        res.status(201).json(result.rows[0]); // 201 Created
+    } catch (err) {
+        console.error('Lỗi khi thêm bài test:', err);
+        if (err.code === '23503') { // Foreign key violation
+            return res.status(400).json({ error: 'level_id hoặc unit_id không tồn tại. Không thể thêm bài test.' });
+        }
+        res.status(500).json({ error: 'Lỗi server khi thêm bài test.' });
+    }
+});
+/**
+ * PUT /tests/:id
+ * Cập nhật thông tin của một bài test.
+ * `image_url` trong body là đường dẫn ảnh mới hoặc null nếu muốn xóa ảnh.
+ */
+app.put('/tests/:id', async (req, res) => {
+    const test_id = parseInt(req.params.id);
+    const { level_id, unit_id, title, image_url, description } = req.body;
+
+    if (isNaN(test_id)) {
+        return res.status(400).json({ error: 'ID bài test không hợp lệ.' });
+    }
+    if (!level_id || !title) {
+        return res.status(400).json({ error: 'Thiếu level_id hoặc title để sửa bài test.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Lấy đường dẫn ảnh hiện tại của bài test từ database trước khi cập nhật
+        const oldTestResult = await client.query(
+            'SELECT image_url FROM tests WHERE test_id = $1',
+            [test_id]
+        );
+        const oldImageUrl = oldTestResult.rows[0] ? oldTestResult.rows[0].image_url : null;
+
+        // 2. Cập nhật thông tin bài test trong database
+        const updateTestQuery = `
+            UPDATE tests
+            SET level_id = $1, unit_id = $2, title = $3, image_url = $4, description = $5
+            WHERE test_id = $6
+            RETURNING *
+        `;
+        const updatedTestResult = await client.query(
+            updateTestQuery,
+            [
+                parseInt(level_id),
+                unit_id ? parseInt(unit_id) : null,
+                title,
+                image_url || null,
+                description || null,
+                test_id
+            ]
+        );
+
+        if (updatedTestResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Không tìm thấy bài test để cập nhật.' });
+        }
+
+        // 3. Xử lý xóa file ảnh cũ nếu có ảnh mới được cung cấp và khác ảnh cũ, hoặc nếu ảnh cũ bị xóa
+        if (oldImageUrl && (image_url !== oldImageUrl || image_url === null)) {
+            // Đảm bảo deleteImageFile có thể xử lý đường dẫn tương đối của ảnh tests
+            deleteTestImageFile(oldImageUrl);
+        }
+
+        await client.query('COMMIT');
+        res.status(200).json(updatedTestResult.rows[0]);
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Lỗi khi cập nhật bài test:', err);
+        if (err.code === '23503') { // Foreign key violation
+            return res.status(400).json({ error: 'level_id hoặc unit_id không tồn tại. Không thể cập nhật bài test.' });
+        }
+        res.status(500).json({ error: 'Lỗi server khi cập nhật bài test.' });
+    } finally {
+        client.release();
+    }
+});
+/**
+ * DELETE /tests/:id
+ * Xóa một bài test khỏi database và xóa file ảnh liên quan (nếu có) trên server.
+ */
+app.delete('/tests/:id', async (req, res) => {
+    const test_id = parseInt(req.params.id);
+
+    if (isNaN(test_id)) {
+        return res.status(400).json({ error: 'ID bài test không hợp lệ.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Lấy đường dẫn ảnh của bài test trước khi xóa khỏi database
+        const getImageUrlResult = await client.query(
+            'SELECT image_url FROM tests WHERE test_id = $1',
+            [test_id]
+        );
+        const imageUrlToDelete = getImageUrlResult.rows[0] ? getImageUrlResult.rows[0].image_url : null;
+
+        // 2. Xóa bài test khỏi database
+        const deleteResult = await client.query(
+            'DELETE FROM tests WHERE test_id = $1 RETURNING *',
+            [test_id]
+        );
+
+        if (deleteResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Không tìm thấy bài test.' });
+        }
+
+        await client.query('COMMIT'); // Commit transaction trước khi xóa file vật lý
+
+        // 3. Xóa file ảnh vật lý trên server sau khi database đã được cập nhật thành công
+        if (imageUrlToDelete) {
+            // Đảm bảo deleteImageFile có thể xử lý đường dẫn tương đối của ảnh tests
+            deleteTetImageFile(imageUrlToDelete);
+        }
+
+        res.status(200).json({ message: 'Đã xóa bài test thành công.', deletedTest: deleteResult.rows[0] });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Lỗi khi xóa bài test:', err);
+        res.status(500).json({ error: 'Lỗi server khi xóa bài test.' });
+    } finally {
+        client.release();
+    }
+}); 
+
+
+app.get('/questiontypes', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT type_id, type_name FROM questiontypes ORDER BY type_id ASC');
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error('Lỗi khi lấy loại câu hỏi:', error);
+    res.status(500).json({ error: 'Lỗi server.' });
+  }
+});
+
+/**
+ * @route POST /api/upload-test-image
+ * @desc Tải ảnh minh họa cho bài test
+ */
+app.post('/api/upload-test-image', uploadTestImage.single('testImage'), (req, res) => {
+    const { oldImagePath } = req.body;
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'Không có ảnh được gửi lên.' });
+    }
+
+    // Xóa ảnh cũ nếu có
+    if (oldImagePath) {
+        const fullOldPath = path.join(__dirname, '..', 'src', 'assets', oldImagePath);
+        fs.unlink(fullOldPath, err => {
+            if (err) {
+                console.warn('Không thể xóa ảnh test cũ:', err.message);
+            } else {
+                console.log('Đã xóa ảnh test cũ:', oldImagePath);
+            }
+        });
+    }
+
+    const imageUrl = `/images/tests/${req.file.filename}`;
+    res.status(200).json({ message: 'Tải ảnh bài test thành công.', imageUrl });
+});
+
+/**
+ * GET /questions?type_id=&level_id=&unit_id=
+ */
+app.get('/questions', async (req, res) => {
+  const { type_id, level_id, unit_id, test_id } = req.query;
+
+  if (!type_id || isNaN(type_id)) {
+    return res.status(400).json({ error: 'type_id không hợp lệ.' });
+  }
+
+  try {
+    const filters = ['q.type_id = $1'];
+    const values = [parseInt(type_id)];
+    let paramIdx = 2;
+
+    if (level_id && !isNaN(level_id)) {
+      filters.push(`t.level_id = $${paramIdx}`);
+      values.push(parseInt(level_id));
+      paramIdx++;
+    }
+
+    if (unit_id && !isNaN(unit_id)) {
+      filters.push(`t.unit_id = $${paramIdx}`);
+      values.push(parseInt(unit_id));
+      paramIdx++;
+    }
+
+    if (test_id && !isNaN(test_id)) {
+      filters.push(`q.test_id = $${paramIdx}`);
+      values.push(parseInt(test_id));
+      paramIdx++;
+    }
+
+    const query = `
+      SELECT q.question_id, q.test_id, q.type_id, q.content, q.image_path, q.correct_answer, q.audio_path
+      FROM questions q
+      LEFT JOIN tests t ON q.test_id = t.test_id
+      WHERE ${filters.join(' AND ')}
+      ORDER BY q.question_id ASC
+    `;
+
+    const result = await pool.query(query, values);
+    const questions = result.rows;
+    const questionIds = questions.map(q => q.question_id);
+
+    let answers = [];
+    if (questionIds.length > 0 && parseInt(type_id) === 1) {
+      const answersResult = await pool.query(
+        'SELECT answer_id, question_id, answer_text, is_correct FROM answers WHERE question_id = ANY($1::int[])',
+        [questionIds]
+      );
+      answers = answersResult.rows;
+    }
+
+    const questionsWithAnswers = questions.map(q => ({
+      ...q,
+      answers: parseInt(type_id) === 1
+        ? answers.filter(a => a.question_id === q.question_id)
+        : [],
+    }));
+
+    res.status(200).json(questionsWithAnswers);
+  } catch (err) {
+    console.error('Lỗi khi lấy câu hỏi:', err);
+    res.status(500).json({ error: 'Lỗi server.' });
+  }
+});
+
+/**
+ * POST /questions
+ */
+
+/**
+ * POST /questions
+ * Tạo một câu hỏi mới.
+ * Trường `image_path` trong body sẽ chứa đường dẫn URL của ảnh đã được tải lên.
+ */
+app.post('/questions', async (req, res) => {
+    const {
+        type_id,
+        test_id,
+        content,
+        image_path, // Đã đổi tên từ 'image' sang 'image_path' để phù hợp với database
+        correct_answer,
+        answers,
+        audio_path
+    } = req.body;
+
+    if (!type_id || isNaN(type_id) || !content) {
+        return res.status(400).json({ error: 'Thiếu type_id hoặc content không hợp lệ.' });
+    }
+
+    if (parseInt(type_id) === 1) { // Kiểm tra cho loại câu hỏi trắc nghiệm
+        if (!Array.isArray(answers) || answers.length !== 4) {
+            return res.status(400).json({ error: 'Câu hỏi trắc nghiệm phải có đúng 4 đáp án.' });
+        }
+    }
+
+    const client = await pool.connect(); // Bắt đầu một transaction database
+    try {
+        await client.query('BEGIN');
+
+        const insertQuestionQuery = `
+            INSERT INTO questions (test_id, type_id, content, image_path, correct_answer, audio_path)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING question_id
+        `;
+        const insertValues = [
+            test_id || null, // test_id có thể null
+            type_id,
+            content,
+            image_path || null, // Lưu đường dẫn ảnh nhận được từ frontend
+            parseInt(type_id) === 2 ? correct_answer : null, // correct_answer chỉ cho loại câu hỏi điền/tự luận
+            audio_path || null // audio_path có thể null
+        ];
+
+        const result = await client.query(insertQuestionQuery, insertValues);
+        const questionId = result.rows[0].question_id;
+
+        let insertedAnswers = [];
+
+        if (parseInt(type_id) === 1 && Array.isArray(answers)) {
+            const insertAnswerQuery = `
+                INSERT INTO answers (question_id, answer_text, is_correct)
+                VALUES ($1, $2, $3)
+                RETURNING answer_id, answer_text, is_correct
+            `;
+
+            for (const a of answers) {
+                // Đảm bảo is_correct là boolean để lưu vào database
+                const is_correct_bool = typeof a.is_correct === 'boolean' ? a.is_correct : (a.is_correct === 'true' || a.is_correct === 1);
+                const answerResult = await client.query(insertAnswerQuery, [questionId, a.answer_text, is_correct_bool]);
+                insertedAnswers.push({
+                    answer_id: answerResult.rows[0].answer_id,
+                    question_id: questionId,
+                    answer_text: answerResult.rows[0].answer_text,
+                    is_correct: answerResult.rows[0].is_correct
+                });
+            }
+        }
+
+        await client.query('COMMIT'); // Hoàn tất transaction
+
+        const responseData = {
+            question_id: questionId,
+            test_id: test_id || null,
+            type_id: parseInt(type_id),
+            content,
+            image_path: image_path || null,
+            correct_answer: parseInt(type_id) === 2 ? correct_answer : null,
+            audio_path: audio_path || null,
+            answers: parseInt(type_id) === 1 ? insertedAnswers : []
+        };
+
+        res.status(201).json(responseData);
+
+    } catch (error) {
+        await client.query('ROLLBACK'); // Hoàn tác transaction nếu có lỗi
+        console.error('Lỗi khi thêm câu hỏi:', error);
+        res.status(500).json({ error: 'Lỗi server khi thêm câu hỏi.' });
+    } finally {
+        client.release(); // Giải phóng client khỏi pool
+    }
+});
+
+/**
+ * PUT /questions/:id
+ */
+
+/**
+ * PUT /questions/:id
+ * Cập nhật thông tin của một câu hỏi.
+ * `image_path` trong body là đường dẫn ảnh mới hoặc null nếu muốn xóa ảnh.
+ */
+app.put('/questions/:id', async (req, res) => {
+    const questionId = parseInt(req.params.id);
+    const {
+        content,
+        image_path,       // Đường dẫn ảnh mới hoặc null
+        audio_path,       // Đã đổi tên từ 'audio' sang 'audio_path' cho nhất quán
+        correct_answer,   // Đã đổi tên từ 'correct' sang 'correct_answer' cho nhất quán
+        type_id,
+        answers
+    } = req.body;
+
+    if (isNaN(questionId)) {
+        return res.status(400).json({ error: 'ID câu hỏi không hợp lệ.' });
+    }
+
+    if (!content || !type_id) {
+        return res.status(400).json({ error: 'Thiếu dữ liệu cập nhật.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Lấy đường dẫn ảnh hiện tại của câu hỏi từ database trước khi cập nhật
+        const oldQuestionResult = await client.query(
+            'SELECT image_path FROM questions WHERE question_id = $1',
+            [questionId]
+        );
+        const oldImagePath = oldQuestionResult.rows[0] ? oldQuestionResult.rows[0].image_path : null;
+
+        // 2. Cập nhật thông tin câu hỏi trong database
+        const updateQuestionQuery = `
+            UPDATE questions
+            SET content = $1,
+                image_path = $2,
+                correct_answer = $3,
+                audio_path = $4
+            WHERE question_id = $5
+            RETURNING question_id, test_id, type_id, content, image_path, correct_answer, audio_path
+        `;
+        const updatedQuestionResult = await client.query(
+            updateQuestionQuery,
+            [
+                content,
+                image_path || null, // Lưu đường dẫn ảnh mới (hoặc null)
+                type_id === 2 ? correct_answer : null,
+                audio_path || null,
+                questionId
+            ]
+        );
+
+        if (updatedQuestionResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Không tìm thấy câu hỏi để cập nhật.' });
+        }
+        const updatedQuestion = updatedQuestionResult.rows[0];
+
+        // 3. Xử lý xóa file ảnh cũ nếu có ảnh mới được cung cấp và khác ảnh cũ, hoặc nếu ảnh cũ bị xóa
+        if (oldImagePath && (image_path !== oldImagePath || image_path === null)) {
+            deleteImageFile(oldImagePath);
+        }
+
+        // 4. Xóa tất cả đáp án cũ và thêm lại đáp án mới (nếu là câu hỏi trắc nghiệm)
+        await client.query('DELETE FROM answers WHERE question_id = $1', [questionId]);
+        if (type_id === 1 && Array.isArray(answers) && answers.length > 0) {
+            // Kiểm tra số lượng đáp án cho câu hỏi trắc nghiệm
+            if (answers.length !== 4) {
+                 await client.query('ROLLBACK');
+                 return res.status(400).json({ error: 'Câu hỏi trắc nghiệm phải có đúng 4 đáp án.' });
+            }
+            const insertAnswerQuery = `
+                INSERT INTO answers (question_id, answer_text, is_correct)
+                VALUES ($1, $2, $3)
+            `;
+            for (const a of answers) {
+                const is_correct_bool = typeof a.is_correct === 'boolean' ? a.is_correct : (a.is_correct === 'true' || a.is_correct === 1);
+                await client.query(insertAnswerQuery, [questionId, a.answer_text, is_correct_bool]);
+            }
+        }
+
+        await client.query('COMMIT');
+
+        // 5. Lấy lại các đáp án đã cập nhật để gửi về cho frontend trong response
+        let answerRows = [];
+        if (type_id === 1) {
+            const answerResult = await pool.query(
+                `SELECT answer_id, question_id, answer_text, is_correct FROM answers WHERE question_id = $1`,
+                [questionId]
+            );
+            answerRows = answerResult.rows;
+        }
+
+        res.status(200).json({
+            ...updatedQuestion,
+            answers: type_id === 1 ? answerRows : []
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Lỗi khi cập nhật câu hỏi:', error);
+        res.status(500).json({ error: 'Lỗi server khi cập nhật câu hỏi.' });
+    } finally {
+        client.release();
+    }
+});
+
+/**
+ * DELETE /questions/:id
+ */
+
+/**
+ * DELETE /questions/:id
+ * Xóa một câu hỏi khỏi database và xóa file ảnh liên quan (nếu có) trên server.
+ */
+app.delete('/questions/:id', async (req, res) => {
+    const questionId = parseInt(req.params.id);
+    if (isNaN(questionId)) {
+        return res.status(400).json({ error: 'ID câu hỏi không hợp lệ.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Lấy đường dẫn ảnh của câu hỏi trước khi xóa khỏi database
+        const getImagePathResult = await client.query(
+            'SELECT image_path FROM questions WHERE question_id = $1',
+            [questionId]
+        );
+        const imagePathToDelete = getImagePathResult.rows[0] ? getImagePathResult.rows[0].image_path : null;
+
+        // 2. Xóa các câu trả lời liên quan đến câu hỏi này
+        await client.query('DELETE FROM answers WHERE question_id = $1', [questionId]);
+
+        // 3. Xóa câu hỏi khỏi database
+        const deleteResult = await client.query(
+            'DELETE FROM questions WHERE question_id = $1 RETURNING question_id',
+            [questionId]
+        );
+
+        if (deleteResult.rows.length === 0) {
+            await client.query('ROLLBACK'); // Hoàn tác nếu không tìm thấy câu hỏi
+            return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' });
+        }
+
+        await client.query('COMMIT'); // Commit transaction trước khi xóa file vật lý
+
+        // 4. Xóa file ảnh vật lý trên server sau khi database đã được cập nhật thành công
+        if (imagePathToDelete) {
+            deleteImageFile(imagePathToDelete); // Sử dụng hàm xóa file đã định nghĩa
+        }
+
+        res.status(200).json({ message: 'Đã xóa câu hỏi thành công.' });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Lỗi khi xóa câu hỏi:', error);
+        res.status(500).json({ error: 'Lỗi server khi xóa câu hỏi.' });
+    } finally {
+        client.release();
+    }
+});
+
+/**
+ * @route POST /api/upload-question-image
+ * @desc Tải ảnh minh họa cho câu hỏi
+ */
+app.post('/api/upload-question-image', uploadQuestionImage.single('questionImage'), (req, res) => {
+    const { oldImagePath } = req.body;
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'Không có ảnh được gửi lên.' });
+    }
+
+    // Xóa ảnh cũ nếu có
+    if (oldImagePath) {
+        const fullOldPath = path.join(__dirname, '..', 'src', 'assets', oldImagePath);
+        fs.unlink(fullOldPath, (err) => {
+            if (err) console.warn('Không thể xóa ảnh cũ:', err.message);
+        });
+    }
+
+    const imageUrl = `/images/questions/${req.file.filename}`;
+    res.status(200).json({
+        message: 'Tải ảnh thành công.',
+        imageUrl: imageUrl,
+    });
 });
 
 
