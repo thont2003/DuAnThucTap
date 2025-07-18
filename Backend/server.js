@@ -247,8 +247,8 @@ app.use('/avatars', express.static('public/avatars')); // Thư mục chứa ản
 // Cấu hình kết nối PostgreSQL
 const pool = new Pool({
     user: 'postgres',
-    host: '192.168.1.188', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
-    database: 'english',
+    host: '192.168.1.3', // Đảm bảo IP này đúng và có thể truy cập được từ thiết bị/giả lập của bạn
+    database: 'data2',
     password: '123',
     port: 5432,
 });
@@ -720,27 +720,35 @@ app.get('/history/user/:userId', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `SELECT 
+            `SELECT
                 h.history_id,
                 h.user_id,
                 u.username,
                 h.test_id,
                 t.title AS test_title,
+                t.level_id,         -- Thêm level_id từ bảng tests
+                l.name AS level_name, -- Lấy tên level từ bảng levels
+                t.unit_id,          -- Thêm unit_id từ bảng tests (nếu có)
+                un.title AS unit_name, -- Lấy tên unit từ bảng units (nếu có)
                 h.score,
                 h.total_questions,
                 h.correct_answers,
                 h.taken_at,
                 h.user_answers
-            FROM 
+            FROM
                 public.history AS h
-            JOIN 
+            JOIN
                 public.users AS u ON h.user_id = u.id
-            JOIN 
+            JOIN
                 public.tests AS t ON h.test_id = t.test_id
-            WHERE 
+            JOIN
+                public.levels AS l ON t.level_id = l.level_id
+            LEFT JOIN -- Sử dụng LEFT JOIN vì unit_id có thể là NULL trong bảng tests
+                public.units AS un ON t.unit_id = un.unit_id
+            WHERE
                 h.user_id = $1::INTEGER
-            ORDER BY 
-                h.taken_at DESC`, // Sắp xếp theo thời gian mới nhất
+            ORDER BY
+                h.taken_at DESC`,
             [userId]
         );
         res.status(200).json(result.rows);
